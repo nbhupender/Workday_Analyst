@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workday AI Router - Playground & Debugger</title>
+    <!-- Premium Google Fonts: Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/index.css">
+</head>
+<body>
+    <div class="app-container">
+        
+        <!-- ================= SIDEBAR (LEFT) ================= -->
+        <aside class="sidebar glass">
+            <div class="sidebar-header">
+                <div class="app-logo">
+                    <span class="logo-icon">✦</span>
+                    <h1>Workday Router</h1>
+                </div>
+                <button id="new-chat-btn" class="btn btn-secondary" title="Start new conversation">
+                    <span class="btn-icon">+</span> New Chat
+                </button>
+            </div>
+            
+            <div class="history-section">
+                <h2>Query History</h2>
+                <div id="history-list" class="history-list">
+                    <!-- Loaded dynamically -->
+                    <div class="history-placeholder">No queries logged yet</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ================= MAIN CHAT (CENTER) ================= -->
+        <main class="chat-area">
+            <header class="chat-header glass">
+                <div class="header-info">
+                    <h2>AI Assistant</h2>
+                    <span class="status-badge"><span class="status-dot"></span> Online</span>
+                </div>
+                <div class="header-options">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="debug-toggle" checked>
+                        <span class="slider"></span>
+                        <span class="toggle-label">Debug Mode</span>
+                    </label>
+                </div>
+            </header>
+
+            <div id="chat-messages" class="chat-messages">
+                <div class="system-welcome card glass">
+                    <h3>Welcome to the Workday AI Router Playground!</h3>
+                    <p>Ask questions or perform actions in plain English. The supervisor will decompose your query, fetch resources, and synthesize the result.</p>
+                    <div class="suggested-queries">
+                        <button class="suggest-btn">Who reports to employee 21431?</button>
+                        <button class="suggest-btn">What is the job title of Betty Liu?</button>
+                        <button class="suggest-btn">List all workers in the London office.</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="typing-indicator glass" id="typing-indicator">
+                <div class="typing-dots">
+                    <span></span><span></span><span></span>
+                </div>
+                <span class="typing-text">Planning execution steps...</span>
+            </div>
+
+            <footer class="input-area glass">
+                <form id="chat-form" class="chat-form">
+                    <textarea 
+                        id="query-input" 
+                        placeholder="Type your Workday query here... (e.g. Hire a regular worker in Chicago)" 
+                        rows="1" 
+                        required
+                    ></textarea>
+                    <button type="submit" id="send-btn" class="btn btn-primary" title="Send message">
+                        <span>Send</span> ✦
+                    </button>
+                </form>
+            </footer>
+        </main>
+
+        <!-- ================= DEBUG EXPLORER (RIGHT) ================= -->
+        <section class="debug-explorer glass">
+            <header class="debug-header">
+                <h2>Execution Insights</h2>
+            </header>
+
+            <nav class="debug-tabs">
+                <button class="tab-btn active" data-tab="tab-plan">Plan</button>
+                <button class="tab-btn" data-tab="tab-rag">RAG Routing</button>
+                <button class="tab-btn" data-tab="tab-raw">Raw Output</button>
+            </nav>
+
+            <div class="debug-content-container">
+                
+                <!-- TAB: PLAN -->
+                <div id="tab-plan" class="tab-pane active">
+                    <div class="plan-summary">
+                        <span class="plan-goal-label">Goal:</span>
+                        <p id="plan-goal" class="plan-goal-text">No active execution plan loaded.</p>
+                    </div>
+                    <div id="plan-steps-list" class="steps-list">
+                        <!-- Loaded dynamically -->
+                        <div class="debug-placeholder">Plan steps will appear here when you execute a query.</div>
+                    </div>
+                </div>
+
+                <!-- TAB: RAG ROUTING -->
+                <div id="tab-rag" class="tab-pane">
+                    <div id="rag-routes-list" class="rag-list">
+                        <!-- Loaded dynamically -->
+                        <div class="debug-placeholder">RAG vector matches and confidence scores will appear here.</div>
+                    </div>
+                </div>
+
+                <!-- TAB: RAW OUTPUT -->
+                <div id="tab-raw" class="tab-pane">
+                    <div class="raw-response-container">
+                        <pre id="raw-json-viewer" class="json-viewer">Select a step or query to view raw API execution contexts.</pre>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </div>
+    
+    <script src="/static/index.js"></script>
+</body>
+</html>
