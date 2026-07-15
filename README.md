@@ -138,25 +138,50 @@ uv run python scripts/ingest_soap.py
 
 ---
 
-## Running the MCP Server
+## How to Use It
 
-### Option A — MCP Inspector (recommended for testing)
-Launches an interactive browser UI at `http://localhost:5173`:
+This project offers multiple ways to run, test, and connect the Workday RAG Router to frontend clients and LLM systems.
+
+### 1. MCP Inspector (Tool Development & Testing)
+The Model Context Protocol (MCP) Inspector is a web-based debugger that lets you interactively test the server's tools without writing custom code or loading it into an LLM client.
+
+To start the server in dev mode with the MCP Inspector:
 ```bash
 uv run --with mcp mcp dev src/server.py
 ```
+This command starts the MCP server and automatically hosts the inspector interface at:
+* **Inspector UI:** `http://localhost:5173`
 
-### Option B — Direct server (for production / Claude Desktop)
-```bash
-uv run python -m src.server
-```
-*The server communicates over stdin/stdout (STDIO transport) waiting for JSON-RPC messages from the client.*
+Inside the Inspector web UI, you can call exposed tools such as `ask_workday` or `execute_workday_action` to inspect plans, response payloads, and logs in real-time.
 
 ---
 
-## Connecting to Claude Desktop
+### 2. Local Host & Website (FastAPI HTTP Server & Frontend SPA)
+The project includes a FastAPI web backend coupled with a Single Page Application (SPA) frontend interface.
 
-Add this block to your Claude Desktop config file:
+To run the local web server:
+```bash
+uv run uvicorn src.api:app --reload --port 8000
+```
+
+Once running, you can open:
+* **Interactive Frontend (Website):** [http://localhost:8000](http://localhost:8000)
+  * Serves the static single-page interface from the `static/` directory.
+  * Allows you to enter natural language queries and view generated plans, execution logs, and synthesized answers.
+* **Swagger API Docs (FastAPI):** [http://localhost:8000/docs](http://localhost:8000/docs)
+  * Provides an interactive playground to test REST endpoints:
+    * `GET /ask?query=...` – Execute read-only natural language queries.
+    * `GET /plan?query=...` – Preview the execution plan without running it.
+    * `GET /api/history` – Retrieve the last 20 queries from the logs.
+
+---
+
+### 3. Connecting to LLM Clients (Claude, Cursor, etc.)
+
+Since this server adheres to the Model Context Protocol, any compatible LLM client can connect to it over standard I/O (stdio).
+
+#### Connecting to Claude Desktop
+Add the following configuration block to your Claude Desktop configuration file:
 
 * **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
 * **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
@@ -172,7 +197,27 @@ Add this block to your Claude Desktop config file:
   }
 }
 ```
-Restart Claude Desktop to load the tools.
+*Note: Make sure to replace `C:\\path\\to\\workday-mcp-router` with the actual absolute path to your repository and virtual environment Python interpreter.*
+
+After updating the config file, restart Claude Desktop. The Workday MCP tools will be active and available via the plug icon.
+
+#### Connecting to Cursor IDE
+To allow Cursor's composer or chat to use the Workday tools:
+1. Open Cursor and go to **Settings** -> **Features** -> **MCP**.
+2. Click **+ Add New MCP Server**.
+3. Fill out the fields:
+   * **Name:** `workday-router`
+   * **Type:** `command`
+   * **Command:** `uv run python -m src.server` (or point to the absolute path of your Python executable: `"C:\path\to\workday-mcp-router\.venv\Scripts\python.exe" -m src.server`)
+4. Save the configuration and verify the green "connected" status indicator.
+
+#### Connecting to VS Code Extensions (Cline / Roo Code / etc.)
+If you use extensions like Cline or Roo Code:
+1. Go to the extension's MCP configuration settings.
+2. Add a new server definition with:
+   * **Command:** `uv`
+   * **Args:** `["run", "python", "-m", "src.server"]`
+   * **Root Cwd:** Your workspace directory `/absolute/path/to/workday-mcp-router`
 
 ---
 
