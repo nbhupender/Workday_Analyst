@@ -45,12 +45,13 @@ def _get_brain():
     return _planner, _executor, _synthesizer
 
 
-def run_intelligent_supervisor(user_prompt: str) -> str:
+def run_intelligent_supervisor(user_prompt: str, history: list = None) -> str:
     """
     Main entry point — called by server.py's ask_workday_assistant MCP tool.
 
     Args:
         user_prompt: the user's natural language question
+        history: optional recent conversation history
 
     Returns:
         A natural-language string answering the question,
@@ -63,7 +64,9 @@ def run_intelligent_supervisor(user_prompt: str) -> str:
 
     # ── PHASE 1: Plan ────────────────────────────────────────────────────────
     try:
-        plan = planner.plan(user_prompt)
+        plan = planner.plan(user_prompt, history=history)
+        if plan.get("status") == "needs_clarification":
+            return plan.get("clarification_question", "Could you please clarify your request?")
     except Exception as e:
         print(f"[Supervisor] Planning failed: {e}", file=sys.stderr)
         return json.dumps({

@@ -28,6 +28,12 @@
       "search worker profiles",
       "query employee data",
       "fetch worker details",
+      "get worker details",
+      "get worker profile details",
+      "get worker company details",
+      "get worker cost center details",
+      "get worker salary details",
+      "get worker job title details",
       "retrieve employee profile summary",
       "get workers",
       "list workers",
@@ -168,6 +174,29 @@
       "check employee career history",
       "get additional jobs or employee contract data",
       "work history, previous roles"
+    ]
+  },
+  {
+    "id": "soap_get_workers-Include_Organizations",
+    "api_name": "get_workers",
+    "type": "response_group",
+    "field": "Include_Organizations",
+    "intent_triggers": [
+      "get worker cost center details",
+      "what is my cost center",
+      "check employee organization or company",
+      "cost center, department, company name, business unit, supervisory organization"
+    ]
+  },
+  {
+    "id": "soap_get_workers-Include_Employment_Information",
+    "api_name": "get_workers",
+    "type": "response_group",
+    "field": "Include_Employment_Information",
+    "intent_triggers": [
+      "get worker position or job details",
+      "employment information, position title, business title",
+      "check worker job profile and employment type"
     ]
   }
 ]

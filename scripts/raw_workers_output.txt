@@ -1,0 +1,272 @@
+{
+  "total": 470,
+  "data": [
+    {
+      "id": "6dcb8106e8b74b5aabb1fc3ab8ef2b92",
+      "descriptor": "Abby Brennan [C]",
+      "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/workers/6dcb8106e8b74b5aabb1fc3ab8ef2b92",
+      "isManager": false,
+      "businessTitle": "Senior Customer Services Representative",
+      "primarySupervisoryOrganization": {
+        "descriptor": "Global Support - USA Group",
+        "id": "dd2061e4fd644a95b4fe2df815462b6b",
+        "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/supervisoryOrganizations/dd2061e4fd644a95b4fe2df815462b6b"
+      },
+      "primaryWorkEmail": "abrennan@workday.net",
+      "primaryWorkPhone": "+1 (773) 721-9821"
+    },
+    {
+      "id": "1da8b422311b4929bfa4520f7f0b4e83",
+      "descriptor": "Adam Carlton",
+      "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/workers/1da8b422311b4929bfa4520f7f0b4e83",
+      "isManager": false,
+      "businessTitle": "Staff Payroll Specialist",
+      "primarySupervisoryOrganization": {
+        "descriptor": "Payroll Department",
+        "id": "951f922be55e1025d2cf64f909a10ca5",
+        "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/supervisoryOrganizations/951f922be55e1025d2cf64f909a10ca5"
+      },
+      "primaryWorkEmail": "acarlton@workday.net"
+    },
+    {
+      "id": "ca392111583a102b55041fd6ebc85b93",
+      "descriptor": "Adesh Shah",
+      "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/workers/ca392111583a102b55041fd6ebc85b93",
+      "isManager": false,
+      "businessTitle": "Resource Manager",
+      "primarySupervisoryOrganization": {
+        "descriptor": "Consulting Services - UK Group",
+        "id": "d6d297809703101a11a7cfb65ee200eb",
+        "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/supervisoryOrganizations/d6d297809703101a11a7cfb65ee200eb"
+      }
+    },
+    {
+      "id": "66def25413f74c13a90829e466a04f23",
+      "descriptor": "Adrian Martin",
+      "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/workers/66def25413f74c13a90829e466a04f23",
+      "isManager": false,
+      "businessTitle": "Senior Manager, Marketing Communications",
+      "primarySupervisoryOrganization": {
+        "descriptor": "Marketing Communications Group",
+        "id": "b2f7176766ed4626a39f344d34f5f5f4",
+        "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/supervisoryOrganizations/b2f7176766ed4626a39f344d34f5f5f4"
+      },
+      "primaryWorkEmail": "amartin@workday.net"
+    },
+    {
+      "id": "fb5c9de9d42201461661d7680c231606",
+      "descriptor": "Aesha Pillay",
+      "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/workers/fb5c9de9d42201461661d7680c231606",
+      "isManager": false,
+      "businessTitle": "Regional Sales Manager",
+      "primarySupervisoryOrganization": {
+        "descriptor": "Field Sales - EMEA Group",
+        "id": "90f311575edb4464847d36bf6b95c446",
+        "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/supervisoryOrganizations/90f311575edb4464847d36bf6b95c446"
+      },
+      "primaryWorkEmail": "aesha.pillay@workday.net",
+      "primaryWorkPhone": "+27 (11) 4454554"
+    },
+    {
+      "id": "c0831f1b82954a37bd9a0ad85fb85367",
+      "descriptor": "Aidan Mitzner",
+      "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/workers/c0831f1b82954a37bd9a0ad85fb85367",
+      "isManager": false,
+      "businessTitle": "Executive Assistant",
+      "primarySupervisoryOrganization": {
+        "descriptor": "Finance & Administration",
+        "id": "1ad7d37487904a989b2db1bfa6fed57d",
+        "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/supervisoryOrganizations/1ad7d37487904a989b2db1bfa6fed57d"
+      },
+      "primaryWorkEmail": "amitzner@workday.net"
+    },
+    {
+      "id": "1a6228638d1401c39ab7f72aae4a0403",
+      "descriptor": "Ainsley Carey",
+      "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/workers/1a6228638d1401c39ab7f72aae4a0403",
+      "isManager": false,
+      "businessTitle": "Regional Sales Manager",
+      "primarySupervisoryOrganization": {
+        "descriptor": "Field Sales - Emerging Markets Group",
+        "id": "741786846970019fe0d137a3eb47e800",
+        "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/supervisoryOrganizations/741786846970019fe0d137a3eb47e800"
+      },
+      "primaryWorkEmail": "ainsley.carey@workday.com"
+    },
+    {
+      "id": "d9cbbb360c404a8b8276ee416e4ab33f",
+      "descriptor": "Ajay Mokashi",
+      "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/workers/d9cbbb360c404a8b8276ee416e4ab33f",
+      "isManager": false,
+      "businessTitle": "Customer Service Representative",
+      "primarySupervisoryOrganization": {
+        "descriptor": "Global Support - Greater India Group",
+        "id": "87e69c4c9f39410ba340bedee7ea84b4",
+        "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/supervisoryOrganizations/87e69c4c9f39410ba340bedee7ea84b4"
+      },
+      "primaryWorkEmail": "amokashi@workday.net",
+      "primaryWorkPhone": "+91 (98) 20.190299"
+    },
+    {
+      "id": "de52fbe58bc84c8b90883502f9f868ed",
+      "descriptor": "Alain DuBois",
+      "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/workers/de52fbe58bc84c8b90883502f9f868ed",
+      "isManager": true,
+      "businessTitle": "Manager, Global Support",
+      "primarySupervisoryOrganization": {
+        "descriptor": "Global Support - North America Group",
+        "id": "2b9dd606a65442768420d425f580a1c6",
+        "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/supervisoryOrganizations/2b9dd606a65442768420d425f580a1c6"
+      },
+      "primaryWorkEmail": "adubois@workday.net"
+    },
+    {
+      "id": "0cc84f94d39044c3bc6338240cdd6c93",
+      "descriptor": "Alberto Bassani",
+      "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/workers/0cc84f94d39044c3bc6338240cdd6c93",
+      "isManager": false,
+      "businessTitle": "Senior Customer Services Representative",
+      "primarySupervisoryOrganization": {
+        "descriptor": "Global Support - Southern Europe Group",
+        "id": "f386578e8518010c5217fe369871bd00",
+        "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/supervisoryOrganizations/f386578e8518010c5217fe369871bd00"
+      },
+      "primaryWorkEmail": "abassani@workday.net"
+    },
+    {
+      "id": "8a09af51d400421dbc5c237f9eac4cc3",
+      "descriptor": "Alejandro Ruiz",
+      "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/workers/8a09af51d400421dbc5c237f9eac4cc3",
+      "isManager": false,
+      "businessTitle": "Customer Service Operations Support",
+      "primarySupervisoryOrganization": {
+        "descriptor": "Global Support - UK & Ireland Group",
+        "id": "7159687c81c24f91b0769772c4a6ac90",
+        "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/supervisoryOrganizations/7159687c81c24f91b0769772c4a6ac90"
+      },
+      "primaryWorkEmail": "aruiz@workday.net",
+      "primaryWorkPhone": "+34 (20) 7486 5800"
+    },
+    {
+      "id": "dec5c2732b764d0eb1f7fe8e2e072ce9",
+      "descriptor": "Alex Grossman",
+      "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/workers/dec5c2732b764d0eb1f7fe8e2e072ce9",
+      "isManager": false,
+      "businessTitle": "Senior Risk Analyst",
+      "primarySupervisoryOrganization": {
+        "descriptor": "Risk Management",
+        "id": "9985da2f0a0045418083bee456d9f085",
+        "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/supervisoryOrganizations/9985da2f0a0045418083bee456d9f085"
+      },
+      "primaryWorkEmail": "agrossman@workday.net"
+    },
+    {
+      "id": "30f0f87f7fc940d5a6dfc67adb89b3cb",
+      "descriptor": "Allison Hunter",
+      "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/workers/30f0f87f7fc940d5a6dfc67adb89b3cb",
+      "isManager": false,
+      "businessTitle": "Product Manager",
+      "primarySupervisoryOrganization": {
+        "descriptor": "Product Management Group",
+        "id": "b992917b246d4f2698bf91f33cdb5681",
+        "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/supervisoryOrganizations/b992917b246d4f2698bf91f33cdb5681"
+      },
+      "primaryWorkEmail": "ahunter@workday.net",
+      "primaryWorkPhone": "+1 (415) 347-8594"
+    },
+    {
+      "id": "09343b3000f6423081fbaec43f340e5d",
+      "descriptor": "Alvin Hwang",
+      "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/workers/09343b3000f6423081fbaec43f340e5d",
+      "isManager": false,
+      "businessTitle": "Data Scientist",
+      "primarySupervisoryOrganization": {
+        "descriptor": "Information Analysis Department",
+        "id": "6a6f0af30e4d4f15b1f04d3f1876c39f",
+        "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/supervisoryOrganizations/6a6f0af30e4d4f15b1f04d3f1876c39f"
+      },
+      "primaryWorkEmail": "ahwang@workday.net"
+    },
+    {
+      "id": "70ca99bb98c4479599ca0326342516f1",
+      "descriptor": "Amanda Baker",
+      "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/workers/70ca99bb98c4479599ca0326342516f1",
+      "isManager": false,
+      "businessTitle": "Facilities Administrator",
+      "primarySupervisoryOrganization": {
+        "descriptor": "Property Management - USA Group",
+        "id": "af05d1b2797a011c5d22cf59d241740e",
+        "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/supervisoryOrganizations/af05d1b2797a011c5d22cf59d241740e"
+      },
+      "primaryWorkEmail": "abaker@workday.net"
+    },
+    {
+      "id": "03502615485840ceb4beacecf02ddc30",
+      "descriptor": "Amanda Mackenzie",
+      "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/workers/03502615485840ceb4beacecf02ddc30",
+      "isManager": false,
+      "businessTitle": "Product Manager",
+      "primarySupervisoryOrganization": {
+        "descriptor": "Product Management Group",
+        "id": "b992917b246d4f2698bf91f33cdb5681",
+        "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/supervisoryOrganizations/b992917b246d4f2698bf91f33cdb5681"
+      },
+      "primaryWorkEmail": "amackenzie@workday.net"
+    },
+    {
+      "id": "5bb2f85ece5e01b290fdb21cf4819006",
+      "descriptor": "Amber Khumalo",
+      "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/workers/5bb2f85ece5e01b290fdb21cf4819006",
+      "isManager": false,
+      "businessTitle": "Regional Sales Manager",
+      "primarySupervisoryOrganization": {
+        "descriptor": "Field Sales - EMEA Group",
+        "id": "90f311575edb4464847d36bf6b95c446",
+        "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/supervisoryOrganizations/90f311575edb4464847d36bf6b95c446"
+      },
+      "primaryWorkEmail": "amber.khumalo@workday.net",
+      "primaryWorkPhone": "+27  01 445 4548"
+    },
+    {
+      "id": "74f77cc9df4610d4c81e6e23babb1b39",
+      "descriptor": "Amber Vasser",
+      "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/workers/74f77cc9df4610d4c81e6e23babb1b39",
+      "isManager": false,
+      "businessTitle": "Training Specialist",
+      "primarySupervisoryOrganization": {
+        "descriptor": "Global Support - USA Group",
+        "id": "dd2061e4fd644a95b4fe2df815462b6b",
+        "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/supervisoryOrganizations/dd2061e4fd644a95b4fe2df815462b6b"
+      },
+      "primaryWorkEmail": "avasser@workday.net",
+      "primaryWorkPhone": "+1 (773) 864-8796"
+    },
+    {
+      "id": "dd7b18bd75894bd7995a50d42d484956",
+      "descriptor": "Amelia Casias",
+      "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/workers/dd7b18bd75894bd7995a50d42d484956",
+      "isManager": true,
+      "businessTitle": "Manager, Global Support",
+      "primarySupervisoryOrganization": {
+        "descriptor": "Global Support - North America Group",
+        "id": "2b9dd606a65442768420d425f580a1c6",
+        "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/supervisoryOrganizations/2b9dd606a65442768420d425f580a1c6"
+      },
+      "primaryWorkEmail": "acasias@workday.net",
+      "primaryWorkPhone": "+1 (773) 721-0897"
+    },
+    {
+      "id": "0d32ccd079004a1c8954caf934f220d6",
+      "descriptor": "Amit Kapoor",
+      "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/workers/0d32ccd079004a1c8954caf934f220d6",
+      "isManager": false,
+      "businessTitle": "Senior Network Engineer",
+      "primarySupervisoryOrganization": {
+        "descriptor": "Network & Telecom Department",
+        "id": "951f922be55e1025d345085b98620cd7",
+        "href": "https://wcpdev-services1.wd101.myworkday.com/api/api/v1/jll_wcpdev1/supervisoryOrganizations/951f922be55e1025d345085b98620cd7"
+      },
+      "primaryWorkEmail": "akapoor@workday.net"
+    }
+  ]
+}

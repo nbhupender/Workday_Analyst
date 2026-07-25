@@ -175,7 +175,7 @@ class WorkdayDispatcher:
         2. Any matching response group flags.
         """
         print(f"Routing SOAP query: '{query}'...", file=sys.stderr)
-        candidates = self.route_candidates(query, namespace="workday_soap_specs", top_k=10)
+        candidates = self.route_candidates(query, namespace="workday_soap_specs", top_k=30)
         
         service_name = None
         best_service_score = -1.0
@@ -194,6 +194,11 @@ class WorkdayDispatcher:
                     field = cand.get("field")
                     if field and field not in response_fields:
                         response_fields.append(field)
+
+        # Fallback to get_workers if query is a worker lookup and no service was matched explicitly
+        if not service_name:
+            service_name = "get_workers"
+            best_service_score = 0.8
                         
         print(f"SOAP Routing match: service={service_name} (score={best_service_score:.4f}), response_fields={response_fields}", file=sys.stderr)
         return {

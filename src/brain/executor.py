@@ -9,14 +9,15 @@ Routes each plan step to the correct backend:
 import json
 import os
 import sys
+from typing import Any
 from openai import OpenAI
 
 from src.rag.dispatcher import WorkdayDispatcher
 from src.services.workday_client import WorkdayClient
-from src.services.Worker import WorkerSOAPService
+from src.services.worker_soap_service import WorkerSOAPService
 from src.services.hire import HireSOAPService
-from src.utils.token_limiter import clean_workday_response
 from src.utils.reference_resolver import ReferenceResolver
+
 
 _EXTRACT_PROMPT = """You are a JSON field extractor.
 Given a Workday API JSON response, extract ONLY the requested fields.
@@ -145,15 +146,38 @@ class Executor:
             query_params=query_params if query_params else None,
         )
         
-        # 5. Clean + truncate the response
-        response_str = clean_workday_response(raw_data)
+        # 5. Direct JSON serialization of raw_data
+        extract_fields = step.get("extract_fields", [])
+        response_str = json.dumps(raw_data, indent=2, default=str)
+
+
         
         # 6. Extract specific fields the plan says we'll need downstream
-        extract_fields = step.get("extract_fields", [])
         extracted = {}
         if extract_fields:
             extracted = self._extract_fields(response_str, extract_fields)
-            
+
+        # 7. Automatic Fallback Recovery:
+        # If REST response returned None/empty for requested non-ID fields, reframe & escalate to SOAP Get_Workers
+        non_id_fields = [f for f in extract_fields if f.lower() not in ("id", "worker_id")]
+        if non_id_fields and all(extracted.get(f) is None for f in non_id_fields):
+            worker_id = str(raw_data.get("id") or extracted.get("id") or "me").strip()
+            for pfx in ("Worker_ID=", "Employee_ID=", "ID="):
+                worker_id = worker_id.removeprefix(pfx)
+            print(f"[Executor] REST step returned empty values for {non_id_fields}. Reframing & escalating to SOAP Get_Workers for worker_id='{worker_id}'...", file=sys.stderr)
+            fallback_step = {
+                "api_type": "soap",
+                "intent": step.get("intent", f"get worker details for {non_id_fields[0]}"),
+                "api_hint": step.get("api_hint", f"get worker {non_id_fields[0]} details"),
+                "soap_args": {"worker_ids": [worker_id]},
+                "extract_fields": extract_fields,
+            }
+            soap_result = self._run_soap_step(fallback_step, context)
+            if soap_result and not soap_result.get("error"):
+                if soap_result.get("extracted"):
+                    extracted.update(soap_result["extracted"])
+                response_str = soap_result.get("raw_response", response_str)
+
         # Interpolate path parameters to construct the final API called path
         filled_path = final_path
         if self.client.base_url and "api/common/v1" in self.client.base_url and filled_path.startswith("/api/common/v1"):
@@ -193,7 +217,7 @@ class Executor:
         """
         service_name = step.get("service")
         soap_args = dict(step.get("soap_args") or {})
-        self._resolve_references_in_dict(soap_args)
+        self._resolve_references_in_dict(soap_args, context)
         confidence = 1.0
 
         # Run RAG lookup if the planner didn't supply the SOAP service name directly
@@ -201,12 +225,6 @@ class Executor:
             rag_result = self.dispatcher.route_soap_service_and_fields(step["api_hint"])
             service_name = rag_result.get("service")
             confidence = rag_result.get("confidence_score", 0.0)
-            
-            if service_name == "get_workers":
-                # Merge dynamically resolved fields
-                dynamic_fields = rag_result.get("include_fields") or []
-                existing_fields = soap_args.get("include_fields") or []
-                soap_args["include_fields"] = list(set(existing_fields + dynamic_fields))
 
         if not service_name:
             return {
@@ -215,6 +233,23 @@ class Executor:
                 "raw_response": "",
                 "api_called": "SOAP:unknown",
             }
+
+        if service_name == "get_workers":
+            core_fields = [
+                "Include_Personal_Information",
+                "Include_Employment_Information",
+                "Include_Organizations",
+                "Include_Compensation",
+                "Include_Qualifications",
+                "Include_Benefit_Enrollments",
+                "Include_Employee_Review",
+                "Include_User_Account",
+                "Include_Career",
+                "Include_Photo",
+            ]
+            dynamic_fields = rag_result.get("include_fields", []) if 'rag_result' in locals() and isinstance(rag_result, dict) else []
+            existing_fields = soap_args.get("include_fields") or []
+            soap_args["include_fields"] = list(set(existing_fields + dynamic_fields + core_fields))
 
         print(f"[Executor] SOAP branch — service={service_name} (RAG confidence={confidence:.4f})", file=sys.stderr)
 
@@ -250,6 +285,22 @@ class Executor:
 
         try:
             if service_name == "get_workers":
+                # Auto-heal 'me' in worker_ids if present
+                wids = soap_args.get("worker_ids") or []
+                if any(str(w).lower() == "me" for w in wids):
+                    print("[Executor] Detected 'me' in SOAP worker_ids — resolving via REST GET /workers/me...", file=sys.stderr)
+                    try:
+                        me_raw = self.client.execute("GET", "/api/common/v1/workers/me")
+                        me_id = str(me_raw.get("id", "")).strip()
+                        for pfx in ("Worker_ID=", "Employee_ID="):
+                            me_id = me_id.removeprefix(pfx)
+                        if me_id:
+                            soap_args["worker_ids"] = [
+                                me_id if str(w).lower() == "me" else w for w in wids
+                            ]
+                    except Exception as me_err:
+                        print(f"[Executor] Could not resolve 'me' via REST: {me_err}", file=sys.stderr)
+
                 service = WorkerSOAPService()
                 result = service.get_workers(soap_args)
                 api_called = "SOAP:Get_Workers"
@@ -275,11 +326,148 @@ class Executor:
         if extract_fields:
             extracted = self._extract_fields(response_str, extract_fields)
 
+        if service_name == "get_workers":
+            intent = step.get("intent", "")
+            api_hint = step.get("api_hint", "")
+            soap_summary = self._extract_soap_worker_summary(result, intent=intent, api_hint=api_hint)
+            if soap_summary:
+                extracted.update(soap_summary)
+
         return {
             "raw_response": response_str,
             "extracted": extracted,
             "api_called": api_called,
         }
+
+    def _extract_soap_worker_summary(self, result: dict, intent: str = "", api_hint: str = "") -> dict:
+        workers = result.get("workers") or []
+        if not workers:
+            return {}
+
+        import re
+        comp_pattern = re.compile(r"\b(comp|compensation|pay|salary|allowance|earning|wage|bonus|remuneration|financial)\b", re.IGNORECASE)
+        is_comp_requested = bool(comp_pattern.search(f"{intent} {api_hint}"))
+
+        query_text = f"{intent} {api_hint}".lower()
+        is_cost_center = "cost center" in query_text or "cost_center" in query_text or "const center" in query_text
+        is_company = "company" in query_text
+        is_dept = any(k in query_text for k in ["supervisory", "department", "unit", "team"])
+        is_job_title = any(k in query_text for k in ["job title", "title", "position", "role"])
+        is_comp = any(k in query_text for k in ["comp", "compensation", "pay", "salary", "allowance", "earning", "wage", "bonus", "financial"])
+        
+        # If no specific single-attribute intent matched, or if explicit full profile was requested:
+        is_full_profile = not (is_cost_center or is_company or is_dept or is_job_title or is_comp) or "full profile" in query_text or "all details" in query_text
+
+        extracted_workers = []
+        for w in workers:
+            wdata = w.get("Worker_Data") or {}
+            worker_id = wdata.get("Worker_ID")
+            
+            name_detail = (
+                wdata.get("Personal_Data", {})
+                .get("Name_Data", {})
+                .get("Legal_Name_Data", {})
+                .get("Name_Detail_Data", {})
+            )
+            formatted_name = name_detail.get("Formatted_Name") or wdata.get("User_ID")
+            
+            item = {
+                "worker_id": worker_id,
+                "name": formatted_name,
+            }
+
+            # Extract Organizations (Cost Center, Company, Supervisory Org)
+            org_list = wdata.get("Organization_Data", {}).get("Worker_Organization_Data") or []
+            for org in org_list:
+                if not isinstance(org, dict):
+                    continue
+                odata = org.get("Organization_Data") or {}
+                org_name = odata.get("Organization_Name")
+                org_code = odata.get("Organization_Code")
+                type_ref = odata.get("Organization_Type_Reference", {}).get("ID", [])
+                types = [str(t.get("_value_1")) for t in type_ref if isinstance(t, dict)]
+                
+                if "COST_CENTER" in types and org_name and (is_cost_center or is_full_profile):
+                    item["cost_center"] = f"{org_name} ({org_code})" if org_code else org_name
+                elif "COMPANY" in types and org_name and (is_company or is_full_profile):
+                    item["company"] = f"{org_name} ({org_code})" if org_code else org_name
+                elif "SUPERVISORY" in types and org_name and (is_dept or is_full_profile):
+                    item["supervisory_organization"] = org_name
+
+            # Extract Job / Employment Position Title
+            if is_job_title or is_full_profile:
+                job_list = wdata.get("Employment_Data", {}).get("Worker_Job_Data") or []
+                if job_list and isinstance(job_list, list) and isinstance(job_list[0], dict):
+                    pos_data = job_list[0].get("Position_Data") or {}
+                    btitle = pos_data.get("Business_Title") or pos_data.get("Position_Title")
+                    if btitle:
+                        item["job_title"] = btitle
+
+            # Extract Compensation
+            if is_comp or is_full_profile:
+                comp_data = wdata.get("Compensation_Data") or {}
+                comp_summary = comp_data.get("Employee_Compensation_Summary_Data") or {}
+                emp_comp = comp_summary.get("Employee_Compensation_Summary_Data") or {}
+
+                currency = "USD"
+                total_base = emp_comp.get("Total_Base_Pay")
+                total_salary = emp_comp.get("Total_Salary_and_Allowances")
+                primary_basis = emp_comp.get("Primary_Compensation_Basis")
+
+                if total_base:
+                    try:
+                        item["total_base_pay"] = f"${float(total_base):,.2f} {currency}"
+                    except Exception:
+                        item["total_base_pay"] = f"{total_base} {currency}"
+                if total_salary:
+                    try:
+                        item["total_salary_and_allowances"] = f"${float(total_salary):,.2f} {currency}"
+                    except Exception:
+                        item["total_salary_and_allowances"] = f"{total_salary} {currency}"
+                if primary_basis:
+                    try:
+                        item["primary_compensation_basis"] = f"${float(primary_basis):,.2f} {currency}"
+                    except Exception:
+                        item["primary_compensation_basis"] = f"{primary_basis} {currency}"
+
+                pay_group_freq = comp_summary.get("Summary_Data_in_Pay_Group_Frequency") or {}
+                monthly_base = pay_group_freq.get("Total_Base_Pay")
+                if monthly_base:
+                    try:
+                        item["monthly_base_pay"] = f"${float(monthly_base):,.2f} {currency}"
+                    except Exception:
+                        item["monthly_base_pay"] = f"{monthly_base} {currency}"
+
+            extracted_workers.append(item)
+
+        if len(extracted_workers) == 1:
+            return extracted_workers[0]
+        return {"items": extracted_workers, "count": len(extracted_workers)}
+
+    def _resolve_references_in_dict(self, d: dict, context: dict = None):
+        if not d or not isinstance(d, dict):
+            return
+        for key, val in list(d.items()):
+            if isinstance(val, str) and "." in val and val.startswith("step_"):
+                if context:
+                    resolved_val = self._resolve_ref(val, context)
+                    if resolved_val is not None:
+                        d[key] = resolved_val
+            elif isinstance(val, list):
+                new_list = []
+                for item in val:
+                    if isinstance(item, str) and "." in item and item.startswith("step_"):
+                        if context:
+                            resolved_val = self._resolve_ref(item, context)
+                            if resolved_val is not None:
+                                new_list.append(resolved_val)
+                            else:
+                                new_list.append(item)
+                        else:
+                            new_list.append(item)
+                    else:
+                        new_list.append(item)
+                d[key] = new_list
 
     def _resolve_params(self, param_map: dict | None, context: dict) -> dict:
         if not param_map:
@@ -297,8 +485,19 @@ class Executor:
                 )
         return resolved
 
-    def _resolve_ref(self, ref: str, context: dict):
-        if not ref or "." not in ref:
+    def _resolve_ref(self, ref: Any, context: dict):
+        if isinstance(ref, list):
+            res_list = []
+            for item in ref:
+                sub_res = self._resolve_ref(item, context)
+                if sub_res is not None:
+                    if isinstance(sub_res, list):
+                        res_list.extend(sub_res)
+                    else:
+                        res_list.append(sub_res)
+            return res_list if res_list else None
+
+        if not ref or not isinstance(ref, str) or "." not in ref:
             return None
 
         parts = ref.split(".", 1)
@@ -453,10 +652,53 @@ class Executor:
 
         print(f"[Executor] Extracting fields: {fields}", file=sys.stderr)
 
+        # 1. Fast deterministic extraction for collection/list responses
+        try:
+            raw_json = json.loads(response_str)
+            data_array = None
+            if isinstance(raw_json, list):
+                data_array = raw_json
+            elif isinstance(raw_json, dict):
+                for k in ("data", "items", "entries", "results", "Report_Entry"):
+                    if isinstance(raw_json.get(k), list):
+                        data_array = raw_json[k]
+                        break
+            
+            if data_array is not None and len(data_array) > 0:
+                augmented_fields = list(dict.fromkeys(["descriptor", "name"] + list(fields)))
+                items = [
+                    {f: self._deep_find(entry, f) for f in augmented_fields if self._deep_find(entry, f) is not None}
+                    for entry in data_array
+                ]
+                extracted_res = {"items": items, "count": len(items)}
+
+                if isinstance(raw_json, dict):
+                    for total_key in ("total", "totalResults", "totalCount", "@odata.count"):
+                        if total_key in raw_json:
+                            extracted_res["total_records_in_workday"] = raw_json[total_key]
+                            break
+                print(f"[Executor] Deterministic list extraction: {len(items)} item(s) (Total in Workday: {extracted_res.get('total_records_in_workday', len(items))})", file=sys.stderr)
+                return extracted_res
+            elif isinstance(raw_json, dict):
+                extracted_dict = {}
+                for f in fields:
+                    val = self._deep_find(raw_json, f)
+                    if val is not None:
+                        extracted_dict[f] = val
+                if extracted_dict:
+                    print(f"[Executor] Deterministic dict extraction: {extracted_dict}", file=sys.stderr)
+                    return extracted_dict
+
+        except Exception:
+            pass
+
+        # 2. LLM extraction for complex or single-record shapes
+        truncated_response = response_str[:30000] if len(response_str) > 30000 else response_str
         prompt = _EXTRACT_PROMPT.format(
             fields=", ".join(fields),
-            response=response_str[:4000],
+            response=truncated_response,
         )
+
 
         try:
             resp = self.llm.chat.completions.create(
@@ -478,6 +720,7 @@ class Executor:
         except Exception as e:
             print(f"[Executor] Field extraction failed: {e}", file=sys.stderr)
             return self._fallback_extract(response_str, fields)
+
 
     def _fallback_extract(self, response_str: str, fields: list[str]) -> dict:
         """

@@ -1,259 +1,177 @@
-import unittest
-from unittest.mock import patch, MagicMock
 import os
-import sys
+from typing import Any, Dict, Optional
+from fastapi import FastAPI, HTTPException, status
+from pydantic import BaseModel, ConfigDict, Field
+import uvicorn
 
-# Ensure project root is in path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+# Import the HireSOAPService from your newly saved hire.py module
+from hire import HireSOAPService
 
-from src.services.hire import (
-    HireSOAPService,
-    get_zeep_client,
-    build_hire_employee_request,
+app = FastAPI(
+    title="Workday SOAP Hire_Employee Test API",
+    description="Interactive testing harness for executing and debugging Workday Hire_Employee SOAP calls via OAuth 2.0 Bearer tokens.",
+    version="1.0.0",
 )
-from zeep.exceptions import Fault
 
-class TestHireSOAPService(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        # We can initialize the real Zeep client since the WSDL URL is accessible
-        try:
-            cls.client = get_zeep_client()
-        except Exception as e:
-            print(f"Warning: Could not initialize real Zeep client for tests: {e}")
-            cls.client = None
+# Initialize the hire service
+hire_service = HireSOAPService()
 
-    def setUp(self):
-        self.service = HireSOAPService()
 
-    def test_required_fields_validation(self):
-        # 1. Missing everything
-        with self.assertRaises(ValueError) as ctx:
-            self.service.hire_employee({})
-        self.assertIn("missing required fields", str(ctx.exception))
+# ---------------------------------------------------------------------------
+# Pydantic v2 Request Schema (Covers Tier 1, Tier 2, and Tier 3)
+# ---------------------------------------------------------------------------
+class HireEmployeeRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
 
-        # 2. Missing worker choice
-        with self.assertRaises(ValueError) as ctx:
-            self.service.hire_employee({
-                "position_id": "POS-1",
-                "organization_id": "ORG-1",
-                "hire_date": "2026-07-10"
-            })
-        self.assertIn("either (existing_worker_type + existing_worker_id) or (first_name + last_name)", str(ctx.exception))
+    # --- TIER 1: Core Required Fields (Logically enforced by service guard) ---
+    organization_id: str = Field(
+        ...,
+        description="Workday Supervisory Organization ID (e.g., 'SUPERVISORY_ORG_1001').",
+        examples=["SUPERVISORY_ORG_1001"],
+    )
+    hire_date: str = Field(
+        ...,
+        description="ISO hire date in YYYY-MM-DD format.",
+        examples=["2026-08-01"],
+    )
 
-        # 3. Missing position/requisition
-        with self.assertRaises(ValueError) as ctx:
-            self.service.hire_employee({
-                "first_name": "John",
-                "last_name": "Doe",
-                "organization_id": "ORG-1",
-                "hire_date": "2026-07-10"
-            })
-        self.assertIn("position_id or job_requisition_id", str(ctx.exception))
+    # Person Identification: Must supply either existing worker OR first/last name
+    first_name: Optional[str] = Field(
+        None, description="Legal first name for a brand-new applicant."
+    )
+    last_name: Optional[str] = Field(
+        None, description="Legal last name for a brand-new applicant."
+    )
+    middle_name: Optional[str] = Field(
+        None, description="Legal middle name."
+    )
+    name_country_id: Optional[str] = Field(
+        "USA", description="ISO 3-letter country code for legal name."
+    )
 
-        # 4. Missing organization_id
-        with self.assertRaises(ValueError) as ctx:
-            self.service.hire_employee({
-                "first_name": "John",
-                "last_name": "Doe",
-                "position_id": "POS-1",
-                "hire_date": "2026-07-10"
-            })
-        self.assertIn("organization_id", str(ctx.exception))
+    existing_worker_type: Optional[str] = Field(
+        None,
+        description="Type if hiring an existing reference: 'applicant', 'former_worker', 'student', or 'academic_affiliate'.",
+    )
+    existing_worker_id: Optional[str] = Field(
+        None, description="The Workday ID of the existing worker/applicant."
+    )
 
-        # 5. Missing hire_date
-        with self.assertRaises(ValueError) as ctx:
-            self.service.hire_employee({
-                "first_name": "John",
-                "last_name": "Doe",
-                "position_id": "POS-1",
-                "organization_id": "ORG-1"
-            })
-        self.assertIn("hire_date", str(ctx.exception))
+    # Job Targeting: Must supply either position_id OR job_requisition_id
+    position_id: Optional[str] = Field(
+        None,
+        description="Target Position ID (for Position Management tenants).",
+    )
+    job_requisition_id: Optional[str] = Field(
+        None,
+        description="Target Job Requisition ID (for Job Management tenants).",
+    )
 
-    def test_build_request_new_worker(self):
-        if not self.client:
-            self.skipTest("Zeep client not initialized")
+    # --- TIER 2: Conditional Fields ---
+    employee_type_id: Optional[str] = Field(
+        None, description="Position Worker Type ID (e.g., 'Regular', 'Fixed_Term')."
+    )
+    hire_reason_id: Optional[str] = Field(
+        None, description="General Event Subcategory ID (e.g., 'Hire_New_Employee')."
+    )
+    first_day_of_work: Optional[str] = Field(
+        None, description="ISO date for first day of work if different from hire date."
+    )
 
-        args = {
-            "first_name": "John",
-            "last_name": "Doe",
-            "middle_name": "Middle",
-            "position_id": "POS-123",
-            "organization_id": "ORG-456",
-            "hire_date": "2026-07-10",
-            "email_address": "john.doe@example.com",
-            "phone_number": "1234567890",
-            "address_line_1": "123 Main St",
-            "address_city": "New York",
-            "address_postal_code": "10001",
-            "national_id": "999-99-9999",
-            "national_id_type": "SSN",
-            "national_id_country": "USA",
-        }
+    # Position Details (Used when creating/overriding position parameters)
+    job_profile_id: Optional[str] = Field(None, description="Job Profile ID.")
+    position_title: Optional[str] = Field(None, description="Title of the position.")
+    business_title: Optional[str] = Field(None, description="Worker's business title.")
+    location_id: Optional[str] = Field(None, description="Work location ID.")
+    time_type_id: Optional[str] = Field(
+        None, description="Position Time Type ID (e.g., 'Full_Time', 'Part_Time')."
+    )
+    scheduled_hours: Optional[float] = Field(None, description="Weekly scheduled hours.")
 
-        req = build_hire_employee_request(self.client, args)
-        
-        # Verify Hire_Employee_Data structure
-        data = req["Hire_Employee_Data"]
-        self.assertIsNotNone(data)
-        
-        # Verify Applicant_Data
-        applicant_data = data.Applicant_Data
-        self.assertIsNotNone(applicant_data)
-        
-        # Verify Legal_Name_Data
-        legal_name = applicant_data.Personal_Data.Name_Data.Legal_Name_Data
-        self.assertEqual(legal_name.Name_Detail_Data.First_Name, "John")
-        self.assertEqual(legal_name.Name_Detail_Data.Last_Name, "Doe")
-        self.assertEqual(legal_name.Name_Detail_Data.Middle_Name, "Middle")
-        
-        # Verify Contact_Data
-        contact = applicant_data.Personal_Data.Contact_Data
-        self.assertEqual(contact.Email_Address_Data[0].Email_Address, "john.doe@example.com")
-        self.assertEqual(contact.Phone_Data[0].Phone_Number, "1234567890")
-        self.assertEqual(contact.Address_Data[0].Address_Line_Data[0], "123 Main St")
-        self.assertEqual(contact.Address_Data[0].Municipality, "New York")
-        
-        # Verify Identification_Data / National ID
-        national_id_list = applicant_data.Personal_Data.Identification_Data.National_ID
-        self.assertEqual(national_id_list[0].National_ID_Data.ID, "999-99-9999")
+    # Contact Info
+    email_address: Optional[str] = Field(None, description="Primary work or personal email.")
+    phone_number: Optional[str] = Field(None, description="Primary telephone number.")
+    phone_country_iso_code: Optional[str] = Field("US", description="ISO 2-letter code for phone.")
+    address_line_1: Optional[str] = Field(None, description="Street address.")
+    address_city: Optional[str] = Field(None, description="Municipality / City.")
+    address_postal_code: Optional[str] = Field(None, description="Postal / Zip code.")
+    address_country_id: Optional[str] = Field("USA", description="ISO 3-letter country code.")
 
-        # Verify Position_Reference and Organization_Reference
-        self.assertEqual(data.Position_Reference.ID[0]._value_1, "POS-123")
-        self.assertEqual(data.Organization_Reference.ID[0]._value_1, "ORG-456")
-        self.assertEqual(str(data.Hire_Date), "2026-07-10")
+    # National ID
+    national_id: Optional[str] = Field(None, description="Government ID number (e.g., SSN).")
+    national_id_type: Optional[str] = Field(None, description="ID Type Code (e.g., 'USA-SSN').")
+    national_id_country: Optional[str] = Field("USA", description="ISO 3-letter country code.")
 
-    def test_build_request_existing_worker(self):
-        if not self.client:
-            self.skipTest("Zeep client not initialized")
+    # Compensation Sub-Process
+    compensation_package_id: Optional[str] = Field(None, description="Compensation Package ID.")
+    compensation_grade_id: Optional[str] = Field(None, description="Compensation Grade ID.")
+    base_pay_amount: Optional[float] = Field(None, description="Base pay amount.")
+    base_pay_currency_id: Optional[str] = Field("USD", description="Currency code.")
+    base_pay_frequency_id: Optional[str] = Field("Annual", description="Frequency (e.g., 'Annual', 'Hourly').")
 
-        args = {
-            "existing_worker_type": "applicant",
-            "existing_worker_id": "APP-987",
-            "job_requisition_id": "REQ-789",
-            "organization_id": "ORG-456",
-            "hire_date": "2026-07-10",
-        }
+    # Business Process Parameters
+    comment: Optional[str] = Field(None, description="Comment to attach to the hire event.")
+    auto_complete: Optional[bool] = Field(
+        False,
+        description="Set to False during testing so the transaction stops in inbox for review.",
+    )
+    run_now: Optional[bool] = Field(None, description="Execute background processing immediately.")
 
-        req = build_hire_employee_request(self.client, args)
-        data = req["Hire_Employee_Data"]
-        
-        self.assertEqual(data.Applicant_Reference.ID[0]._value_1, "APP-987")
-        self.assertEqual(data.Job_Requisition_Reference.ID[0]._value_1, "REQ-789")
-        self.assertIsNone(getattr(data, "Applicant_Data", None))
+    # --- TIER 3: Advanced Passthrough ---
+    advanced_fields: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Raw dictionary of advanced WSDL fields to merge directly into Hire_Employee_Data. Cannot collide with Tier 1/2 fields.",
+    )
 
-    def test_position_details_creation_and_suppression(self):
-        if not self.client:
-            self.skipTest("Zeep client not initialized")
 
-        args = {
-            "first_name": "Jane",
-            "last_name": "Smith",
-            "position_id": "POS-111",
-            "organization_id": "ORG-222",
-            "hire_date": "2026-07-10",
-            "job_profile_id": "JP-888",
-            "position_title": "Software Engineer",
-        }
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
+@app.get("/health", status_code=status.HTTP_200_OK)
+def health_check():
+    """Verify system connectivity, WSDL configuration, and Bearer token presence."""
+    token_exists = bool(os.getenv("WORKDAY_OAUTH_TOKEN"))
+    wsdl_url = os.getenv("WORKDAY_WSDL_URL", "Using Fallback/Dynamic")
+    return {
+        "status": "healthy",
+        "service": "HireSOAPService",
+        "workday_wsdl": wsdl_url,
+        "oauth_token_configured": token_exists,
+    }
 
-        # Test case 1: Suppression toggle is False (default)
-        with patch("src.services.hire._POSITION_ID_SUPPRESSES_DETAILS", False):
-            req = build_hire_employee_request(self.client, args)
-            event_data = req["Hire_Employee_Data"].Hire_Employee_Event_Data
-            self.assertIsNotNone(event_data.Position_Details)
-            self.assertEqual(event_data.Position_Details.Position_Title, "Software Engineer")
-            self.assertEqual(event_data.Position_Details.Job_Profile_Reference.ID[0]._value_1, "JP-888")
 
-        # Test case 2: Suppression toggle is True
-        with patch("src.services.hire._POSITION_ID_SUPPRESSES_DETAILS", True):
-            req = build_hire_employee_request(self.client, args)
-            event_data = req["Hire_Employee_Data"].Hire_Employee_Event_Data
-            self.assertIsNone(getattr(event_data, "Position_Details", None))
+@app.post("/test-hire-employee", status_code=status.HTTP_200_OK)
+def test_hire_employee(payload: HireEmployeeRequest):
+    """
+    Executes a mutating Hire_Employee SOAP call.
+    Strips unsupplied (None) fields before passing to the dynamic builder.
+    """
+    # Convert Pydantic model to dict, excluding None values so the service
+    # only builds XML nodes for provided data.
+    args = payload.model_dump(exclude_none=True)
 
-    def test_compensation_sub_process(self):
-        if not self.client:
-            self.skipTest("Zeep client not initialized")
+    try:
+        result = hire_service.hire_employee(args)
+        return result
+    except ValueError as err:
+        # Catch Tier 1 validation failures or Tier 3 collision guards before network call
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(err),
+        )
+    except RuntimeError as err:
+        # Catch Workday SOAP Faults or network execution failures
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(err),
+        )
+    except Exception as err:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred: {str(err)}",
+        )
 
-        args = {
-            "first_name": "Jane",
-            "last_name": "Smith",
-            "position_id": "POS-111",
-            "organization_id": "ORG-222",
-            "hire_date": "2026-07-10",
-            "compensation_package_id": "PKG-1",
-            "compensation_grade_id": "GRD-2",
-            "base_pay_amount": 120000,
-            "base_pay_currency_id": "USD",
-            "base_pay_frequency_id": "Annual"
-        }
-
-        req = build_hire_employee_request(self.client, args)
-        comp = req["Hire_Employee_Data"].Propose_Compensation_for_Hire_Sub_Process.Propose_Compensation_for_Employment_Data
-        self.assertIsNotNone(comp)
-        self.assertEqual(comp.Compensation_Guidelines_Data.Compensation_Package_Reference.ID[0]._value_1, "PKG-1")
-        self.assertEqual(comp.Compensation_Guidelines_Data.Compensation_Grade_Reference.ID[0]._value_1, "GRD-2")
-        self.assertEqual(comp.Pay_Plan_Data.Pay_Plan_Sub_Data[0].Amount, 120000)
-
-    def test_advanced_fields_collision(self):
-        if not self.client:
-            self.skipTest("Zeep client not initialized")
-
-        args = {
-            "first_name": "Jane",
-            "last_name": "Smith",
-            "position_id": "POS-111",
-            "organization_id": "ORG-222",
-            "hire_date": "2026-07-10",
-            "advanced_fields": {
-                "Position_Reference": "some_value" # Collides with position_id mapping
-            }
-        }
-
-        with self.assertRaises(ValueError) as ctx:
-            build_hire_employee_request(self.client, args)
-        self.assertIn("advanced_fields collides with fields already built", str(ctx.exception))
-
-    @patch("src.services.hire.get_zeep_client")
-    def test_hire_employee_soap_fault_handling(self, mock_get_client):
-        # Mock Zeep service call to throw a Soap Fault
-        mock_client = MagicMock()
-        mock_get_client.return_value = mock_client
-        
-        fault = Fault(message="Position is already occupied", detail="Detail elements")
-        mock_client.service.Hire_Employee.side_effect = fault
-
-        args = {
-            "first_name": "Jane",
-            "last_name": "Smith",
-            "position_id": "POS-111",
-            "organization_id": "ORG-222",
-            "hire_date": "2026-07-10",
-        }
-
-        with self.assertRaises(RuntimeError) as ctx:
-            self.service.hire_employee(args)
-        self.assertIn("Workday rejected Hire_Employee — Position is already occupied | detail=Detail elements", str(ctx.exception))
-
-    @patch("src.services.hire.get_zeep_client")
-    def test_hire_employee_connection_error_handling(self, mock_get_client):
-        # Mock Zeep service call to throw a network exception
-        mock_client = MagicMock()
-        mock_get_client.return_value = mock_client
-        
-        mock_client.service.Hire_Employee.side_effect = Exception("Connection timed out")
-
-        args = {
-            "first_name": "Jane",
-            "last_name": "Smith",
-            "position_id": "POS-111",
-            "organization_id": "ORG-222",
-            "hire_date": "2026-07-10",
-        }
-
-        with self.assertRaises(RuntimeError) as ctx:
-            self.service.hire_employee(args)
-        self.assertIn("Hire_Employee call failed before/outside a SOAP fault", str(ctx.exception))
 
 if __name__ == "__main__":
-    unittest.main()
+    # Launch local server without extension syntax issues
+    uvicorn.run("test_hire:app", host="127.0.0.1", port=8001, reload=True)

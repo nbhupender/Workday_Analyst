@@ -4,7 +4,7 @@ import sys
 from urllib.parse import urlencode
 from src.rag.dispatcher import WorkdayDispatcher
 from src.services.workday_client import WorkdayClient
-from src.utils.token_limiter import clean_workday_response
+
 
 class WorkdayRouterTool:
     def __init__(self):
@@ -47,8 +47,9 @@ class WorkdayRouterTool:
                 payload=body
             )
             
-            # 4. Clean and truncate response to protect token limits
-            response_str = clean_workday_response(workday_response)
+            # 4. Format response as JSON
+            response_str = json.dumps(workday_response, indent=2, default=str)
+
             
             return json.dumps({
                 "executed_url": f"{method} {final_path}",

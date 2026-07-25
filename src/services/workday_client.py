@@ -61,12 +61,6 @@ class WorkdayClient:
         # 3. Construct Full URL Properly
         url = f"{self.base_url.rstrip('/')}/{full_path.lstrip('/')}"
         
-        # --- CACHE CHECK ---
-        cache_key = f"{method.upper()}:{url}:{json.dumps(query_params, sort_keys=True)}"
-        if method.upper() == "GET" and cache_key in self.cache:
-            print(f"[Cache] Returning CACHED response for: {url}", file=sys.stderr)
-            return self.cache[cache_key]
-        
         # 4. Setup Authorization Headers
         headers = {
             "Authorization": f"Bearer {token}",
@@ -87,11 +81,45 @@ class WorkdayClient:
             response.raise_for_status()
             data = response.json()
             
-            # Store in cache if successful GET retrieval operation
-            if method.upper() == "GET":
-                self.cache[cache_key] = data
+            # --- AUTOMATIC REST PAGINATION LOOP ---
+            # If GET collection returns total metadata exceeding page 1 items,
+            # automatically fetch remaining pages so full dataset is retrieved.
+            if method.upper() == "GET" and isinstance(data, dict) and "data" in data and "total" in data:
+                total_count = data.get("total", 0)
+                items = data.get("data", [])
                 
+                if isinstance(items, list) and total_count > len(items) and len(items) > 0:
+                    page_limit = len(items)
+                    offset = len(items)
+                    base_params = dict(query_params or {})
+                    print(f"[WorkdayClient] Auto-paginating: retrieved {len(items)} of {total_count} total records. Fetching remaining pages...", file=sys.stderr)
+                    
+                    while len(items) < total_count and offset < total_count:
+                        next_params = dict(base_params)
+                        next_params["offset"] = offset
+                        next_params["limit"] = page_limit
+                        try:
+                            next_resp = requests.request(
+                                method="GET",
+                                url=url,
+                                headers=headers,
+                                params=next_params,
+                            )
+                            next_resp.raise_for_status()
+                            next_json = next_resp.json()
+                            next_items = next_json.get("data", []) if isinstance(next_json, dict) else []
+                            if not next_items:
+                                break
+                            items.extend(next_items)
+                            offset += len(next_items)
+                        except Exception as page_exc:
+                            print(f"[WorkdayClient] Auto-pagination loop stopped early: {page_exc}", file=sys.stderr)
+                            break
+                    data["data"] = items
+                    print(f"[WorkdayClient] Auto-pagination complete. Total collected records: {len(data['data'])}", file=sys.stderr)
+
             return data
+
             
         except requests.exceptions.RequestException as e:
             print(f"Workday API Error: {e}", file=sys.stderr)

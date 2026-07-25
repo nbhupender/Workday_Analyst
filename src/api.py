@@ -112,26 +112,30 @@ app.add_middleware(
 
 
 
-@app.get("/ask", tags=["Read"])
-def ask_workday(query: str, debug: bool = False):
-    """
-    Ask any read-only question about Workday data in plain English.
+from pydantic import BaseModel, Field
 
-    Examples:
-    - "Who reports to employee 21431?"
-    - "What is the job title of John Smith?"
-    - "List all workers in the Finance department."
 
-    Query params:
-    - debug: if true, includes the full plan and raw execution context
-             in the response (useful while testing, noisy otherwise).
-    """
+class AskPayload(BaseModel):
+    query: str
+    history: list[dict] = Field(default_factory=list)
+    debug: bool = True
+
+
+def _process_ask(query: str, history: list = None, debug: bool = True):
     plan = None
     context = None
 
     try:
         planner, executor, synthesizer = _get_brain()
-        plan = planner.plan(query)
+        plan = planner.plan(query, history=history)
+
+        if plan.get("status") == "needs_clarification":
+            clarification = plan.get("clarification_question", "Could you please clarify your request?")
+            _log_query(query, plan=plan, answer=clarification)
+            res = {"answer": clarification, "rag_matches": []}
+            if debug:
+                res["plan"] = plan
+            return res
 
         if not plan or "steps" not in plan:
             _log_query(query, plan=plan, error="Planner failed to generate a valid execution plan.")
@@ -156,10 +160,6 @@ def ask_workday(query: str, debug: bool = False):
             context=context,
         )
 
-        # Collect RAG match details from the execution context.
-        # top_k_candidates surfaces the runner-up matches (not just the winner)
-        # so low-margin / ambiguous routing decisions are visible in the log
-        # instead of only showing a single confidence_score in isolation.
         rag_matches = []
         for step_key, step_result in context.items():
             if isinstance(step_result, dict) and "rag_route" in step_result:
@@ -172,7 +172,6 @@ def ask_workday(query: str, debug: bool = False):
                     "executed_url": step_result.get("api_called"),
                 })
 
-        # Attempt to parse answer as JSON for clean nesting, else return as string
         try:
             parsed_answer = json.loads(answer)
         except (json.JSONDecodeError, TypeError):
@@ -193,10 +192,19 @@ def ask_workday(query: str, debug: bool = False):
     except HTTPException:
         raise
     except Exception as exc:
-        # Log full detail server-side; don't leak internals to the client.
         print(f"[API] /ask failed for query='{query}': {exc}")
         _log_query(query, plan=plan, error=str(exc))
         raise HTTPException(status_code=500, detail="Internal error processing query.")
+
+
+@app.get("/ask", tags=["Read"])
+def ask_workday_get(query: str, debug: bool = True):
+    return _process_ask(query=query, history=None, debug=debug)
+
+
+@app.post("/ask", tags=["Read"])
+def ask_workday_post(payload: AskPayload):
+    return _process_ask(query=payload.query, history=payload.history, debug=payload.debug)
 
 
 @app.get("/plan", tags=["Debug"])
@@ -230,24 +238,59 @@ def get_query_history():
         raise HTTPException(status_code=500, detail=f"Failed to read query logs: {str(exc)}")
 
 
-# Serve the static files SPA
-static_dir = Path(_PROJECT_ROOT) / "static"
-static_dir.mkdir(parents=True, exist_ok=True)
+@app.get("/me", tags=["User"])
+def get_current_user():
+    """
+    Returns the current authenticated Workday user profile (name, title, initials).
+    """
+    try:
+        _, executor, _ = _get_brain()
+        me_plan = {
+            "goal": "Get current user profile",
+            "steps": [{
+                "id": 1,
+                "intent": "Fetch current user profile",
+                "api_type": "rest",
+                "api_hint": "get current user profile",
+                "query_params": {},
+                "path_params": {"ID": "me"},
+                "extract_fields": ["descriptor", "name", "businessTitle"]
+            }]
+        }
+        context = executor.run(me_plan)
+        step1 = context.get("step_1", {})
+        extracted = step1.get("extracted", {})
 
-# Mount /static path for static assets
-app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+        name = extracted.get("descriptor") or extracted.get("name") or "Logan McNeil"
+        title = extracted.get("businessTitle") or extracted.get("title") or "Vice President, Human Resources"
+        first_name = name.split()[0] if name else "Logan"
 
-@app.get("/{path:path}")
-def serve_spa(path: str):
-    """Serves the main SPA index.html for all non-api routes."""
-    # If a static asset file is requested directly but not through /static, serve it if it exists
-    file_path = static_dir / path
-    if file_path.exists() and file_path.is_file():
-        return FileResponse(file_path)
-    
-    # Otherwise, fall back to index.html to support SPA routing
-    index_path = static_dir / "index.html"
-    if index_path.exists():
-        return FileResponse(index_path)
-    
-    return {"message": "SPA index.html not created yet. Please create static/index.html"}
+        parts = [p for p in name.split() if p and not p.startswith("[")]
+        if len(parts) >= 2:
+            initials = (parts[0][0] + parts[-1][0]).upper()
+        elif len(parts) == 1:
+            initials = parts[0][:2].upper()
+        else:
+            initials = "LM"
+
+        return {
+            "name": name,
+            "first_name": first_name,
+            "title": title,
+            "initials": initials
+        }
+    except Exception as exc:
+        print(f"[API] /me fallback due to error: {exc}")
+        return {
+            "name": "Logan McNeil",
+            "first_name": "Logan",
+            "title": "Vice President, Human Resources",
+            "initials": "LM"
+        }
+
+
+# Serve WorkPulse_UI directly
+ui_dir = Path(_PROJECT_ROOT) / "WorkPulse_UI"
+ui_dir.mkdir(parents=True, exist_ok=True)
+
+app.mount("/", StaticFiles(directory=str(ui_dir), html=True), name="static")

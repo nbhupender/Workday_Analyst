@@ -42,6 +42,9 @@ def ask_workday(natural_language_query: str) -> str:
         # 2. Let the Planner LLM decompose the query to inspect safety
         plan = planner.plan(natural_language_query)
 
+        if plan.get("status") == "needs_clarification":
+            return plan.get("clarification_question", "Could you please clarify your query?")
+
         if not plan or "steps" not in plan:
             return json.dumps({"status": "error", "message": "Planner failed to generate a valid execution schema."})
 
