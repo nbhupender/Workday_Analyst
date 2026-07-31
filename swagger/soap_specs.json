@@ -130,7 +130,8 @@
     "intent_triggers": [
       "get worker legal name and birth date",
       "fetch worker contact details like phone or email",
-      "home address, contact information"
+      "home address, contact information",
+      "gender, male, female, sex, date of birth, age, dob"
     ]
   },
   {
@@ -196,7 +197,8 @@
     "intent_triggers": [
       "get worker position or job details",
       "employment information, position title, business title",
-      "check worker job profile and employment type"
+      "check worker job profile and employment type",
+      "years of service, hire date, tenure, job location, office location, country"
     ]
   }
 ]

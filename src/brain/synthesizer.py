@@ -27,6 +27,11 @@ Your job:
 6. Be concise — don't pad with filler phrases.
 7. STRICT RELEVANCE & SCOPE: Output ONLY facts and attributes that directly address the user's specific question. Do not include unrequested extra attributes (such as financial pay data when asked for organizational placement, or contact details when asked for position title).
 8. HONEST GAP ACKNOWLEDGEMENT: If a specific requested property is unavailable in the data, state that it was not found clearly and politely. Never output unrequested topics as fallback filler.
+9. MATHEMATICAL & AGGREGATE CALCULATIONS (Sums, Averages, Ratios, Counts):
+   - When asked to perform calculations (e.g., finding an average, a sum, or a ratio), always calculate the result carefully.
+   - Show your step-by-step arithmetic details (e.g., "The sum is X, the count is Y, which yields an average of Z") to ensure correctness.
+   - Parse numbers carefully: remove currency symbols ($), commas (,), and text suffixes (e.g., "USD") before running calculations.
+   - Be precise with percentages and ratios.
 """
 
 

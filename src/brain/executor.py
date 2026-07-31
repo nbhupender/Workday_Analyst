@@ -345,6 +345,7 @@ class Executor:
             return {}
 
         import re
+        from datetime import datetime
         comp_pattern = re.compile(r"\b(comp|compensation|pay|salary|allowance|earning|wage|bonus|remuneration|financial)\b", re.IGNORECASE)
         is_comp_requested = bool(comp_pattern.search(f"{intent} {api_hint}"))
 
@@ -354,9 +355,13 @@ class Executor:
         is_dept = any(k in query_text for k in ["supervisory", "department", "unit", "team"])
         is_job_title = any(k in query_text for k in ["job title", "title", "position", "role"])
         is_comp = any(k in query_text for k in ["comp", "compensation", "pay", "salary", "allowance", "earning", "wage", "bonus", "financial"])
+        is_gender = any(k in query_text for k in ["gender", "sex", "male", "female"])
+        is_age = any(k in query_text for k in ["age", "birth", "dob"])
+        is_years_service = any(k in query_text for k in ["service", "tenure", "hire"])
+        is_location = any(k in query_text for k in ["location", "city", "country"])
         
         # If no specific single-attribute intent matched, or if explicit full profile was requested:
-        is_full_profile = not (is_cost_center or is_company or is_dept or is_job_title or is_comp) or "full profile" in query_text or "all details" in query_text
+        is_full_profile = not (is_cost_center or is_company or is_dept or is_job_title or is_comp or is_gender or is_age or is_years_service or is_location) or "full profile" in query_text or "all details" in query_text
 
         extracted_workers = []
         for w in workers:
@@ -395,13 +400,75 @@ class Executor:
                     item["supervisory_organization"] = org_name
 
             # Extract Job / Employment Position Title
+            job_list = wdata.get("Employment_Data", {}).get("Worker_Job_Data") or []
             if is_job_title or is_full_profile:
-                job_list = wdata.get("Employment_Data", {}).get("Worker_Job_Data") or []
                 if job_list and isinstance(job_list, list) and isinstance(job_list[0], dict):
                     pos_data = job_list[0].get("Position_Data") or {}
                     btitle = pos_data.get("Business_Title") or pos_data.get("Position_Title")
                     if btitle:
                         item["job_title"] = btitle
+
+            # Extract Location & Years of Service
+            if is_location or is_years_service or is_full_profile:
+                emp_data = wdata.get("Employment_Data") or {}
+                
+                if is_years_service or is_full_profile:
+                    hire_date_str = None
+                    if isinstance(job_list, list) and job_list:
+                        pos_data = job_list[0].get("Position_Data") or {}
+                        hire_date_str = job_list[0].get("Hire_Date") or pos_data.get("Start_Date")
+                    if not hire_date_str:
+                        hire_date_str = emp_data.get("Hire_Date") or emp_data.get("Original_Hire_Date")
+                    if hire_date_str:
+                        item["hire_date"] = str(hire_date_str)
+                        try:
+                            hire_dt = datetime.fromisoformat(str(hire_date_str).split('T')[0])
+                            today = datetime.today()
+                            yos = (today - hire_dt).days / 365.25
+                            item["years_of_service"] = round(yos, 1)
+                        except Exception:
+                            pass
+                
+                if is_location or is_full_profile:
+                    if job_list and isinstance(job_list, list) and isinstance(job_list[0], dict):
+                        pos_data = job_list[0].get("Position_Data") or {}
+                        loc_ref = pos_data.get("Location_Reference") or {}
+                        lids = loc_ref.get("ID") or []
+                        loc_val = None
+                        for lid in lids:
+                            if isinstance(lid, dict) and lid.get("type") == "Location_ID":
+                                loc_val = lid.get("_value_1")
+                                break
+                        if not loc_val and lids:
+                            loc_val = lids[0].get("_value_1") if isinstance(lids[0], dict) else str(lids[0])
+                        if loc_val:
+                            item["location"] = loc_val
+
+            # Extract Gender & Birth Date
+            if is_gender or is_age or is_full_profile:
+                pdata = wdata.get("Personal_Data") or {}
+                if is_gender or is_full_profile:
+                    gref = pdata.get("Gender_Reference") or {}
+                    gids = gref.get("ID") or []
+                    gender_val = None
+                    for gid in gids:
+                        if isinstance(gid, dict):
+                            gender_val = gid.get("_value_1")
+                            break
+                    if gender_val:
+                        item["gender"] = gender_val
+                
+                if is_age or is_full_profile:
+                    bdate = pdata.get("Birth_Date")
+                    if bdate:
+                        item["birth_date"] = str(bdate)
+                        try:
+                            dob = datetime.fromisoformat(str(bdate).split('T')[0])
+                            today = datetime.today()
+                            age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+                            item["age"] = age
+                        except Exception:
+                            pass
 
             # Extract Compensation
             if is_comp or is_full_profile:
@@ -659,7 +726,7 @@ class Executor:
             if isinstance(raw_json, list):
                 data_array = raw_json
             elif isinstance(raw_json, dict):
-                for k in ("data", "items", "entries", "results", "Report_Entry"):
+                for k in ("data", "items", "entries", "results", "Report_Entry", "workers"):
                     if isinstance(raw_json.get(k), list):
                         data_array = raw_json[k]
                         break

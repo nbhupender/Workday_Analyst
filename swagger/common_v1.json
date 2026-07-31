@@ -1086,7 +1086,7 @@
           "workers"
         ],
         "summary": "Retrieves a collection of workers.",
-        "description": "Retrieves all workers. Use the search parameter to search for workers by name. The search is case-insensitive.\n\n<b>Secured By Domain:</b> FLW Service, Self-Service: Current Staffing Information, Worker Data: Public Worker Reports\n\n<b>Scope:</b> Staffing",
+        "description": "Retrieves all workers. Use the search parameter to search for workers by name. The search is case-insensitive. Returns details about workers including isManager, yearsOfService, location, primarySupervisoryOrganization, primaryWorkEmail, primaryWorkPhone, and descriptor. Useful for listing employees, counting employees, finding managers, locating workers, and calculating worker metrics.",
         "produces": [
           "application/json"
         ],
