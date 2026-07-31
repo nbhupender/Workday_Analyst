@@ -9,7 +9,7 @@ Flow:
     2. Executor runs each step sequentially, piping outputs between them
     3. Synthesizer produces a clean natural-language answer
 
-Falls back gracefully if planning or any step fails.
+Falls back gracefully if planning or any step fails..
 """
 
 import json
