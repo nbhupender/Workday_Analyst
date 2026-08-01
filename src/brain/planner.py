@@ -103,6 +103,11 @@ Rules:
     Instead, to lookup a worker by name, you MUST use a multi-step plan:
     - Step 1: Search for the worker on the collection endpoint using `"api_hint": "search for worker"` and `"query_params": {"search": "<name>"}`. Set `"extract_fields": ["id"]`.
     - Subsequent steps: Retrieve the profile or subresources mapping `"ID": "step_1.id"` in `"param_map"`.
+16. MATHEMATICAL & AGGREGATE CALCULATIONS (Sums, Averages, Ratios, Counts):
+    - For any query asking for mathematical calculations (e.g., "what is the gender ratio", "average years of service", "average salary", "total headcount", "total salary"):
+      * ALWAYS use SOAP `get_workers` (`"api_type": "soap"`). Do NOT use REST collection endpoints, as REST does not return compensation or demographic details.
+      * Set `api_hint` to describe the target calculation subject (e.g., "get worker personal info for gender ratio", "get worker compensation info for average salary") so RAG matches the correct SOAP response groups.
+      * Specify the exact attributes needed for the calculation (e.g., `["gender"]`, `["years_of_service"]`, `["total_base_pay"]`, `["isManager"]`, `["location"]`) in `extract_fields` of the step.
 
 ALWAYS return ONLY valid JSON in one of these two exact schemas. No markdown, no explanation:
 
@@ -129,9 +134,7 @@ Schema B — IF COMPLETE QUERY:
 
       // SOAP-only fields (set to null for REST steps):
       "service": "get_workers",
-      "soap_args": {
-        "include_fields": [""]
-      },
+      "soap_args": {},
 
       // Common fields:
       "depends_on": null,

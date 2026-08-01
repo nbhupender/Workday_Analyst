@@ -32,33 +32,50 @@ def ingest_soap_data(input_file="swagger/soap_specs.json", namespace="workday_so
     for item in soap_specs:
         item_id = item.get("id")
         api_name = item.get("api_name")
-        item_type = item.get("type") # "service" or "response_group"
-        intents = item.get("intent_triggers", [])
-        params = item.get("parameters", [])
+        
+        # Convert fields dictionary to compatible parameter structures
+        params = []
+        for field_name, field_info in item.get("fields", {}).items():
+            params.append({
+                "name": field_name,
+                "in": "body",
+                "required": "required" in str(field_info.get("use_when", "")).lower(),
+                "type": "string"
+            })
         params_str = json.dumps(params)
         
-        # Determine the target field if it's a response group
-        target_field = item.get("field", "")
-        
+        # 1. Ingest service intents
+        intents = item.get("intent_triggers", [])
         for idx, intent in enumerate(intents):
-            # Generate the vector embedding using our local embedder
             vector_values = embedder.encode_intents(intent)[0]
-            
-            # Create a unique ID for Pinecone
-            vector_id = f"{item_id}-intent-{idx}"
-            
-            # Formulate metadata
+            vector_id = f"{item_id}-service-intent-{idx}"
             metadata = {
                 "api_name": api_name,
                 "method": "SOAP",
                 "api_type": "soap",
-                "type": item_type,
-                "field": target_field,
+                "type": "service",
+                "field": "",
                 "parameters": params_str,
                 "trigger_text": intent
             }
-            
             vectors_to_upsert.append((vector_id, vector_values, metadata))
+            
+        # 2. Ingest response group examples
+        for field_name, group_data in item.get("response_groups", {}).items():
+            examples = group_data.get("examples", [])
+            for idx, example in enumerate(examples):
+                vector_values = embedder.encode_intents(example)[0]
+                vector_id = f"{item_id}-rg-{field_name}-{idx}"
+                metadata = {
+                    "api_name": api_name,
+                    "method": "SOAP",
+                    "api_type": "soap",
+                    "type": "response_group",
+                    "field": field_name,
+                    "parameters": params_str,
+                    "trigger_text": example
+                }
+                vectors_to_upsert.append((vector_id, vector_values, metadata))
             
     print(f"[Ingest SOAP] Generated {len(vectors_to_upsert)} total intent vectors. Pushing to Pinecone (namespace='{namespace}')...")
     

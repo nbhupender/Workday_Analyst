@@ -329,7 +329,7 @@ class Executor:
         if service_name == "get_workers":
             intent = step.get("intent", "")
             api_hint = step.get("api_hint", "")
-            soap_summary = self._extract_soap_worker_summary(result, intent=intent, api_hint=api_hint)
+            soap_summary = self._extract_soap_worker_summary(result, intent=intent, api_hint=api_hint, extract_fields=extract_fields)
             if soap_summary:
                 extracted.update(soap_summary)
 
@@ -339,7 +339,7 @@ class Executor:
             "api_called": api_called,
         }
 
-    def _extract_soap_worker_summary(self, result: dict, intent: str = "", api_hint: str = "") -> dict:
+    def _extract_soap_worker_summary(self, result: dict, intent: str = "", api_hint: str = "", extract_fields: list = None) -> dict:
         workers = result.get("workers") or []
         if not workers:
             return {}
@@ -350,15 +350,17 @@ class Executor:
         is_comp_requested = bool(comp_pattern.search(f"{intent} {api_hint}"))
 
         query_text = f"{intent} {api_hint}".lower()
-        is_cost_center = "cost center" in query_text or "cost_center" in query_text or "const center" in query_text
-        is_company = "company" in query_text
-        is_dept = any(k in query_text for k in ["supervisory", "department", "unit", "team"])
-        is_job_title = any(k in query_text for k in ["job title", "title", "position", "role"])
-        is_comp = any(k in query_text for k in ["comp", "compensation", "pay", "salary", "allowance", "earning", "wage", "bonus", "financial"])
-        is_gender = any(k in query_text for k in ["gender", "sex", "male", "female"])
-        is_age = any(k in query_text for k in ["age", "birth", "dob"])
-        is_years_service = any(k in query_text for k in ["service", "tenure", "hire"])
-        is_location = any(k in query_text for k in ["location", "city", "country"])
+        fields_lower = [str(f).lower() for f in extract_fields] if extract_fields else []
+        
+        is_cost_center = "cost center" in query_text or "cost_center" in query_text or "const center" in query_text or "cost_center" in fields_lower
+        is_company = "company" in query_text or "company" in fields_lower
+        is_dept = any(k in query_text for k in ["supervisory", "department", "unit", "team"]) or "supervisory_organization" in fields_lower or "primarysupervisoryorganization" in fields_lower
+        is_job_title = any(k in query_text for k in ["job title", "title", "position", "role"]) or "job_title" in fields_lower or "business_title" in fields_lower
+        is_comp = any(k in query_text for k in ["comp", "compensation", "pay", "salary", "allowance", "earning", "wage", "bonus", "financial"]) or any(f in fields_lower for f in ["total_base_pay", "total_salary_and_allowances", "primary_compensation_basis", "monthly_base_pay"])
+        is_gender = any(k in query_text for k in ["gender", "sex", "male", "female"]) or "gender" in fields_lower
+        is_age = any(k in query_text for k in ["age", "birth", "dob"]) or any(f in fields_lower for f in ["age", "birth_date", "date_of_birth", "dateofbirth"])
+        is_years_service = any(k in query_text for k in ["service", "tenure", "hire"]) or any(f in fields_lower for f in ["years_of_service", "yearsofservice", "hire_date", "hiredate"])
+        is_location = any(k in query_text for k in ["location", "city", "country"]) or "location" in fields_lower
         
         # If no specific single-attribute intent matched, or if explicit full profile was requested:
         is_full_profile = not (is_cost_center or is_company or is_dept or is_job_title or is_comp or is_gender or is_age or is_years_service or is_location) or "full profile" in query_text or "all details" in query_text

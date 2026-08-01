@@ -2,27 +2,7 @@
   {
     "id": "soap_get_workers",
     "api_name": "get_workers",
-    "type": "service",
-    "parameters": [
-      { "name": "worker_ids", "in": "body", "required": false, "type": "array" },
-      { "name": "organization_id", "in": "body", "required": false, "type": "string" },
-      { "name": "include_subordinate_organizations", "in": "body", "required": false, "type": "boolean" },
-      { "name": "country_id", "in": "body", "required": false, "type": "string" },
-      { "name": "position_id", "in": "body", "required": false, "type": "string" },
-      { "name": "national_id", "in": "body", "required": false, "type": "string" },
-      { "name": "national_id_type", "in": "body", "required": false, "type": "string" },
-      { "name": "national_id_country", "in": "body", "required": false, "type": "string" },
-      { "name": "exclude_inactive_workers", "in": "body", "required": false, "type": "boolean" },
-      { "name": "exclude_employees", "in": "body", "required": false, "type": "boolean" },
-      { "name": "exclude_contingent_workers", "in": "body", "required": false, "type": "boolean" },
-      { "name": "updated_from", "in": "body", "required": false, "type": "string" },
-      { "name": "updated_through", "in": "body", "required": false, "type": "string" },
-      { "name": "effective_from", "in": "body", "required": false, "type": "string" },
-      { "name": "effective_through", "in": "body", "required": false, "type": "string" },
-      { "name": "as_of_effective_date", "in": "body", "required": false, "type": "string" },
-      { "name": "page", "in": "body", "required": false, "type": "integer" },
-      { "name": "count", "in": "body", "required": false, "type": "integer" }
-    ],
+    "description": "Use when the user wants a list of workers, a specific worker's profile, or workers filtered/grouped by any attribute (location, org, position, etc.)",
     "intent_triggers": [
       "get workers list",
       "search worker profiles",
@@ -30,43 +10,126 @@
       "fetch worker details",
       "get worker details",
       "get worker profile details",
-      "get worker company details",
-      "get worker cost center details",
-      "get worker salary details",
-      "get worker job title details",
       "retrieve employee profile summary",
       "get workers",
       "list workers",
       "count workers",
       "list employees",
       "get employees in location or organization"
-    ]
+    ],
+    "fields": {
+      "worker_ids": {
+        "use_when": "User names a specific person, or wants the full profile of one known worker",
+        "examples": ["show me John Smith's profile", "get details for worker ID 12345"]
+      },
+      "organization_id": {
+        "use_when": "User wants workers filtered by or grouped by department, company, cost center, or business unit name",
+        "examples": ["workers from Global Modern Services India", "list employees in the finance department"],
+        "note": "Raw org names must be resolved to this ID via lookup_tables.ORG_MAP before calling the API — never pass the raw string"
+      },
+      "include_subordinate_organizations": {
+        "use_when": "User implies a whole org tree, not just one team — words like 'entire division', 'all under', 'including sub-teams'",
+        "examples": ["everyone under the APAC division"]
+      },
+      "country_id": {
+        "use_when": "User filters by country or region",
+        "examples": ["workers from India", "employees based in the US"],
+        "note": "Resolve country name to ISO code via lookup_tables.COUNTRY_MAP first"
+      },
+      "position_id": {
+        "use_when": "User references a specific job position/requisition, not a job title in general",
+        "examples": ["who holds position REQ-2024-118"]
+      },
+      "national_id": {
+        "use_when": "User provides a legal/government ID for identity lookup — rare in casual queries, only use if explicitly given",
+        "examples": ["find the worker with SSN/Aadhaar number X"]
+      },
+      "exclude_inactive_workers": {
+        "use_when": "Defaults to true (active only). Set to false when the query needs terminated/inactive workers — e.g. attrition, headcount history, 'who left'",
+        "examples": ["attrition rate by month", "workers who left last quarter"]
+      },
+      "exclude_employees": {
+        "use_when": "User explicitly wants only contingent/contract workers, not regular employees",
+        "examples": ["list all contractors, not employees"]
+      },
+      "exclude_contingent_workers": {
+        "use_when": "User explicitly wants only regular employees, not contractors",
+        "examples": ["show only full-time employees"]
+      },
+      "effective_from": {
+        "use_when": "Query has a time range or 'as of' date — required for any metric/trend query (attrition, headcount over time)",
+        "examples": ["attrition rate by month", "headcount as of March"]
+      },
+      "effective_through": {
+        "use_when": "Paired with effective_from to bound a date range",
+        "examples": ["between January and March"]
+      },
+      "as_of_effective_date": {
+        "use_when": "User wants a snapshot at one specific point in time, not a range",
+        "examples": ["headcount as of today", "org structure as of last year"]
+      },
+      "page": { "use_when": "Internal pagination control — not derived from user query, handled by executor" },
+      "count": { "use_when": "Internal pagination control — not derived from user query, handled by executor" }
+    },
+    "response_groups": {
+      "Include_Employment_Information": {
+        "use_when": "User wants job title, position, employment type, or hire/termination dates",
+        "examples": [
+          "what's their job title", 
+          "when were they hired", 
+          "attrition rate by month",
+          "years of service, hire date, tenure, job location, office location, country"
+        ]
+      },
+      "Include_Organizations": {
+        "use_when": "User wants cost center, department, company name, business unit, or supervisory org",
+        "examples": [
+          "what department is she in", 
+          "workers in the finance cost center",
+          "cost center, department, company name, business unit, supervisory organization"
+        ]
+      },
+      "Include_Compensation": {
+        "use_when": "User asks about salary, pay rate, compensation plan",
+        "examples": [
+          "what's his base pay",
+          "get worker compensation details",
+          "check salary and pay rate",
+          "fetch worker wage, payroll, or grade info",
+          "compensation plan, base pay, frequency"
+        ]
+      },
+      "Include_Personal_Information": {
+        "use_when": "User wants legal name, birth date, contact info, address",
+        "examples": [
+          "get her phone number", 
+          "what's his home address",
+          "gender, male, female, sex, date of birth, age, dob"
+        ]
+      },
+      "Include_Career": {
+        "use_when": "User wants work history, previous roles, additional jobs",
+        "examples": ["show her career history", "check employee career history", "get additional jobs or employee contract data", "work history, previous roles"]
+      },
+      "Include_Qualifications": {
+        "use_when": "User wants certifications, education, skills, languages",
+        "examples": ["does he have a PMP certification", "fetch employee certifications and education", "get worker skills and competencies", "check languages or degrees", "qualifications, license details"]
+      },
+      "Include_Benefit_Enrollments": {
+        "use_when": "User asks about health insurance, benefits, plan enrollment",
+        "examples": ["what health plan is she enrolled in", "check employee health insurance plans", "get worker benefit enrollments and eligibility", "dental vision health plan coverages"]
+      },
+      "Include_Employee_Review": {
+        "use_when": "User wants performance reviews, manager feedback, talent assessments",
+        "examples": ["show his last performance review", "check employee performance reviews", "get talent assessment and reviews", "manager feedback, review history"]
+      }
+    },
+    "known_gap": "Management level (director/manager/VP) is not confirmed as a top-level field or response-group in this catalog. Likely nested inside Include_Employment_Information's Worker_Job_Data in the raw XML — must verify against a live payload before entity_resolver.py can map 'director'/'manager' to a real filter value."
   },
   {
     "id": "soap_hire_employee",
     "api_name": "hire_employee",
-    "type": "service",
-    "parameters": [
-      { "name": "first_name", "in": "body", "required": true, "type": "string" },
-      { "name": "last_name", "in": "body", "required": true, "type": "string" },
-      { "name": "middle_name", "in": "body", "required": false, "type": "string" },
-      { "name": "organization_id", "in": "body", "required": true, "type": "string" },
-      { "name": "position_id", "in": "body", "required": false, "type": "string" },
-      { "name": "job_requisition_id", "in": "body", "required": false, "type": "string" },
-      { "name": "hire_date", "in": "body", "required": true, "type": "string" },
-      { "name": "existing_worker_type", "in": "body", "required": false, "type": "string" },
-      { "name": "existing_worker_id", "in": "body", "required": false, "type": "string" },
-      { "name": "email_address", "in": "body", "required": false, "type": "string" },
-      { "name": "phone_number", "in": "body", "required": false, "type": "string" },
-      { "name": "address_line_1", "in": "body", "required": false, "type": "string" },
-      { "name": "address_city", "in": "body", "required": false, "type": "string" },
-      { "name": "address_postal_code", "in": "body", "required": false, "type": "string" },
-      { "name": "comment", "in": "body", "required": false, "type": "string" },
-      { "name": "auto_complete", "in": "body", "required": false, "type": "boolean" },
-      { "name": "base_pay_amount", "in": "body", "required": false, "type": "number" },
-      { "name": "base_pay_currency_id", "in": "body", "required": false, "type": "string" },
-      { "name": "base_pay_frequency_id", "in": "body", "required": false, "type": "string" }
-    ],
+    "description": "Use to hire or onboard a new employee into an organization, establishing their position and initial compensation details.",
     "intent_triggers": [
       "hire a new employee",
       "add a new worker to the organization",
@@ -74,131 +137,54 @@
       "create worker profile",
       "propose compensation for hire",
       "hire employee to supervisory organization"
-    ]
-  },
-  {
-    "id": "soap_get_workers-Include_Compensation",
-    "api_name": "get_workers",
-    "type": "response_group",
-    "field": "Include_Compensation",
-    "intent_triggers": [
-      "get worker compensation details",
-      "check salary and pay rate",
-      "fetch worker wage, payroll, or grade info",
-      "compensation plan, base pay, frequency"
-    ]
-  },
-  {
-    "id": "soap_get_workers-Include_Qualifications",
-    "api_name": "get_workers",
-    "type": "response_group",
-    "field": "Include_Qualifications",
-    "intent_triggers": [
-      "fetch employee certifications and education",
-      "get worker skills and competencies",
-      "check languages or degrees",
-      "qualifications, license details"
-    ]
-  },
-  {
-    "id": "soap_get_workers-Include_Benefit_Enrollments",
-    "api_name": "get_workers",
-    "type": "response_group",
-    "field": "Include_Benefit_Enrollments",
-    "intent_triggers": [
-      "check employee health insurance plans",
-      "get worker benefit enrollments and eligibility",
-      "dental vision health plan coverages"
-    ]
-  },
-  {
-    "id": "soap_get_workers-Include_Employee_Review",
-    "api_name": "get_workers",
-    "type": "response_group",
-    "field": "Include_Employee_Review",
-    "intent_triggers": [
-      "check employee performance reviews",
-      "get talent assessment and reviews",
-      "manager feedback, review history"
-    ]
-  },
-  {
-    "id": "soap_get_workers-Include_Personal_Information",
-    "api_name": "get_workers",
-    "type": "response_group",
-    "field": "Include_Personal_Information",
-    "intent_triggers": [
-      "get worker legal name and birth date",
-      "fetch worker contact details like phone or email",
-      "home address, contact information",
-      "gender, male, female, sex, date of birth, age, dob"
-    ]
-  },
-  {
-    "id": "soap_get_workers-Include_Worker_Documents",
-    "api_name": "get_workers",
-    "type": "response_group",
-    "field": "Include_Worker_Documents",
-    "intent_triggers": [
-      "retrieve worker documents and attachments",
-      "get employee uploaded files",
-      "background check details"
-    ]
-  },
-  {
-    "id": "soap_get_workers-Include_Photo",
-    "api_name": "get_workers",
-    "type": "response_group",
-    "field": "Include_Photo",
-    "intent_triggers": [
-      "get worker photo",
-      "retrieve profile picture of employee"
-    ]
-  },
-  {
-    "id": "soap_get_workers-Include_User_Account",
-    "api_name": "get_workers",
-    "type": "response_group",
-    "field": "Include_User_Account",
-    "intent_triggers": [
-      "check worker user account credentials",
-      "get login or account provisioning information",
-      "username, system account"
-    ]
-  },
-  {
-    "id": "soap_get_workers-Include_Career",
-    "api_name": "get_workers",
-    "type": "response_group",
-    "field": "Include_Career",
-    "intent_triggers": [
-      "check employee career history",
-      "get additional jobs or employee contract data",
-      "work history, previous roles"
-    ]
-  },
-  {
-    "id": "soap_get_workers-Include_Organizations",
-    "api_name": "get_workers",
-    "type": "response_group",
-    "field": "Include_Organizations",
-    "intent_triggers": [
-      "get worker cost center details",
-      "what is my cost center",
-      "check employee organization or company",
-      "cost center, department, company name, business unit, supervisory organization"
-    ]
-  },
-  {
-    "id": "soap_get_workers-Include_Employment_Information",
-    "api_name": "get_workers",
-    "type": "response_group",
-    "field": "Include_Employment_Information",
-    "intent_triggers": [
-      "get worker position or job details",
-      "employment information, position title, business title",
-      "check worker job profile and employment type",
-      "years of service, hire date, tenure, job location, office location, country"
-    ]
+    ],
+    "fields": {
+      "first_name": {
+        "use_when": "First name of the hire candidate",
+        "examples": ["hire John"]
+      },
+      "last_name": {
+        "use_when": "Last name of the hire candidate",
+        "examples": ["hire John Smith"]
+      },
+      "middle_name": {
+        "use_when": "Middle name of the hire candidate"
+      },
+      "organization_id": {
+        "use_when": "The supervisory organization ID where the employee will be placed",
+        "examples": ["hire into org SUPER_123"]
+      },
+      "position_id": {
+        "use_when": "Specific job position ID to place them in"
+      },
+      "job_requisition_id": {
+        "use_when": "Requisition ID related to the hiring event"
+      },
+      "hire_date": {
+        "use_when": "Date the hire is effective",
+        "examples": ["hire effective tomorrow"]
+      },
+      "existing_worker_type": {
+        "use_when": "If the hire is an existing worker type transition"
+      },
+      "existing_worker_id": {
+        "use_when": "The ID of the existing worker if transferring"
+      },
+      "email_address": {
+        "use_when": "Hiring candidate email address"
+      },
+      "phone_number": {
+        "use_when": "Hiring candidate phone number"
+      },
+      "address_line_1": { "use_when": "Address line 1" },
+      "address_city": { "use_when": "City" },
+      "address_postal_code": { "use_when": "Postal code" },
+      "comment": { "use_when": "Comments for the hiring business process" },
+      "auto_complete": { "use_when": "Set true to automatically complete the hiring BP if allowed by workflow" },
+      "base_pay_amount": { "use_when": "Starting base pay numeric amount" },
+      "base_pay_currency_id": { "use_when": "Currency ID (e.g. USD)" },
+      "base_pay_frequency_id": { "use_when": "Frequency ID (e.g. Annual)" }
+    },
+    "response_groups": {}
   }
 ]
