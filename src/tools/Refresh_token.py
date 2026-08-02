@@ -29,6 +29,7 @@ import sys
 import time
 import threading
 import webbrowser
+import socket
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, urlencode
 from datetime import datetime
@@ -107,11 +108,11 @@ def log_refresh(action_type: str, token_data: dict) -> None:
     saved_at_str = datetime.fromtimestamp(token_data.get("saved_at", time.time())).strftime("%Y-%m-%d %H:%M:%S")
     expires_at = token_data.get("expires_at")
     expires_at_str = datetime.fromtimestamp(expires_at).strftime("%Y-%m-%d %H:%M:%S") if expires_at else "N/A"
-    
+
     # Extract access token suffix securely
     access_token = token_data.get("access_token", "")
     token_suffix = f"...{access_token[-12:]}" if len(access_token) >= 12 else "N/A"
-    
+
     log_entry = (
         f"[{timestamp}] ACTION: {action_type}\n"
         f"  - Saved At: {saved_at_str}\n"
@@ -122,7 +123,7 @@ def log_refresh(action_type: str, token_data: dict) -> None:
         f"  - Token Type: {token_data.get('token_type', 'unknown')}\n"
         f"{'-'*60}\n"
     )
-    
+
     # Append to log file
     _default_log_file = os.path.join(_PROJECT_ROOT, "src", "log", "workday_refresh.log")
     log_file = os.getenv("WORKDAY_REFRESH_LOG_FILE", _default_log_file)
@@ -156,7 +157,7 @@ def get_jwt_exp(token: str) -> int | None:
 def save_tokens(token_data: dict, action_type: str = "Token Update") -> None:
     """Persist tokens to disk with an absolute expiry timestamp and log the event."""
     token_data["saved_at"] = time.time()
-    
+
     expires_in = token_data.get("expires_in")
     if expires_in is not None:
         token_data["expires_at"] = token_data["saved_at"] + int(expires_in)
@@ -176,6 +177,7 @@ def save_tokens(token_data: dict, action_type: str = "Token Update") -> None:
     os.chmod(TOKEN_FILE, 0o600)  # owner read/write only
     print(f"[workday_auth] Tokens saved to {TOKEN_FILE}", file=sys.stderr)
     update_env_token(token_data["access_token"])
+    os.environ["WORKDAY_API_TOKEN"] = token_data["access_token"]
     log_refresh(action_type, token_data)
 
 
@@ -207,6 +209,10 @@ _captured_code: str | None = None
 class _CallbackHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         global _captured_code
+
+        # --- DEBUG: confirms the browser's request actually reached this server ---
+        print(f"[workday_auth] Callback received: {self.path}", file=sys.stderr)
+
         parsed = urlparse(self.path)
         params = parse_qs(parsed.query)
 
@@ -222,8 +228,24 @@ class _CallbackHandler(BaseHTTPRequestHandler):
         if "code" in params:
             _captured_code = params["code"][0]
             self.send_response(200)
+            self.send_header("Content-Type", "text/html")
             self.end_headers()
-            self.wfile.write(b"<h2>Authorised. You can close this tab.</h2>")
+            self.wfile.write(b"""
+            <html>
+                <head>
+                    <title>Authorized</title>
+                </head>
+                <body style="font-family: sans-serif; text-align: center; margin-top: 50px;">
+                    <h2>Authorized successfully!</h2>
+                    <p>Redirecting to Workday Analyst Web UI (http://localhost:8000)...</p>
+                    <script>
+                        setTimeout(function() {
+                            window.location.href = "http://localhost:8000";
+                        }, 1000);
+                    </script>
+                </body>
+            </html>
+            """)
         else:
             self.send_response(400)
             self.end_headers()
@@ -233,8 +255,24 @@ class _CallbackHandler(BaseHTTPRequestHandler):
         pass  # silence HTTP server logs
 
 
+class DualStackHTTPServer(HTTPServer):
+    address_family = socket.AF_INET6
+
+    def server_bind(self):
+        try:
+            self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+        except Exception:
+            pass  # fallback if dual stack is not supported on this OS/interface
+        super().server_bind()
+
+
 def _start_callback_server(port: int) -> HTTPServer:
-    server = HTTPServer(("localhost", port), _CallbackHandler)
+    # NOTE: "::" is the explicit IPv6 "any address" wildcard.
+    # "" is ambiguous for an AF_INET6 socket and does NOT reliably
+    # dual-bind IPv4 (127.0.0.1) + IPv6 (::1) on Windows — that was
+    # the root cause of callbacks silently never arriving.
+    server = DualStackHTTPServer(("::", port), _CallbackHandler)
+    print(f"[workday_auth] Callback server listening on [::]:{port} (dual-stack)", file=sys.stderr)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     return server

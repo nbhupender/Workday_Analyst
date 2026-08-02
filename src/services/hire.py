@@ -109,15 +109,17 @@ _zeep_client: Client | None = None
 
 def get_zeep_client() -> Client:
     global _zeep_client
+    from src.tools.Refresh_token import get_valid_token
+    token = get_valid_token()
     if _zeep_client is None:
         session = requests.Session()
 
         # Inject the Bearer token directly into the HTTP Authorization header
-        if OAUTH_TOKEN:
-            session.headers.update({"Authorization": f"Bearer {OAUTH_TOKEN}"})
+        if token:
+            session.headers.update({"Authorization": f"Bearer {token}"})
 
         transport = Transport(session=session, timeout=30)
-        settings = Settings(xml_huge_tree=True)
+        settings = Settings(xml_huge_tree=True, strict=False)
 
         # Note: wsse=UsernameToken(...) is removed to prevent XML auth headers
         _zeep_client = Client(
@@ -125,6 +127,9 @@ def get_zeep_client() -> Client:
             transport=transport,
             settings=settings,
         )
+    else:
+        if token:
+            _zeep_client.transport.session.headers.update({"Authorization": f"Bearer {token}"})
     return _zeep_client
 
 

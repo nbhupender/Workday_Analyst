@@ -133,15 +133,15 @@ RESPONSE_GROUP_FIELDS = [
 # ---------------------------------------------------------------------------
 # 3. ZEEP CLIENT SETUP — Using Bearer Token Transport
 # ---------------------------------------------------------------------------
-def build_zeep_client() -> Client:
+def build_zeep_client(token: str) -> Client:
     session = requests.Session()
 
     # Inject the Bearer token directly into the HTTP Authorization header
-    if OAUTH_TOKEN:
-        session.headers.update({"Authorization": f"Bearer {OAUTH_TOKEN}"})
+    if token:
+        session.headers.update({"Authorization": f"Bearer {token}"})
 
     transport = Transport(session=session, timeout=30)
-    settings = Settings(xml_huge_tree=True)
+    settings = Settings(xml_huge_tree=True, strict=False)
 
     return Client(
         wsdl=WSDL_URL,
@@ -155,8 +155,13 @@ _zeep_client: Client | None = None
 
 def get_zeep_client() -> Client:
     global _zeep_client
+    from src.tools.Refresh_token import get_valid_token
+    token = get_valid_token()
     if _zeep_client is None:
-        _zeep_client = build_zeep_client()
+        _zeep_client = build_zeep_client(token)
+    else:
+        if token:
+            _zeep_client.transport.session.headers.update({"Authorization": f"Bearer {token}"})
     return _zeep_client
 
 

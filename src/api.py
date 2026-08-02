@@ -64,24 +64,47 @@ def _log_query(query, plan=None, rag_matches=None, answer=None, error=None):
 # ── Lifespan: token refresh on startup ───────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Refresh Workday token on startup, then start 30-min background timer."""
-    print("[API] Starting up — refreshing Workday token...")
-    try:
-        from src.tools.Refresh_token import force_refresh
-        force_refresh()
-        print("[API] Token refreshed successfully.")
-    except Exception as exc:
-        print(f"[API] WARNING: Token refresh on startup failed: {exc}")
+    """Start non-blocking token validation and background timers on startup."""
+    import threading, time as _time, webbrowser, sys
 
-    # Start the 30-minute background refresh timer
-    import threading, time as _time
+    # 1. Startup check in separate thread so uvicorn finishes launching and listens on port 8000
+    def _startup_check():
+        import os
+        _time.sleep(1.0)
+        orig_val = os.environ.get("WORKDAY_NON_INTERACTIVE")
+        try:
+            os.environ["WORKDAY_NON_INTERACTIVE"] = "false"
+            from src.tools.Refresh_token import get_valid_token, load_tokens, is_token_expired
+            tokens = load_tokens()
+            if not tokens or is_token_expired(tokens):
+                print("[API] Token is expired or missing. Triggering browser login...", file=sys.stderr)
+                get_valid_token()
+                print("[API] Startup login completed successfully.", file=sys.stderr)
+            else:
+                print("[API] Token is already valid. Launching Web UI at http://localhost:8000", file=sys.stderr)
+                webbrowser.open("http://localhost:8000")
+        except Exception as exc:
+            print(f"[API] WARNING: Startup token check failed: {exc}", file=sys.stderr)
+        finally:
+            if orig_val is not None:
+                os.environ["WORKDAY_NON_INTERACTIVE"] = orig_val
+            else:
+                os.environ.pop("WORKDAY_NON_INTERACTIVE", None)
+
+    threading.Thread(target=_startup_check, daemon=True).start()
+
+    # 2. Start the 30-minute background refresh timer
     def _timer():
         while True:
             _time.sleep(1800)
             try:
-                from src.tools.Refresh_token import force_refresh
-                force_refresh()
-                print("[API] Background token refresh successful.")
+                from src.tools.Refresh_token import load_tokens, is_token_expired, force_refresh
+                tokens = load_tokens()
+                if not tokens or is_token_expired(tokens):
+                    force_refresh()
+                    print("[API] Background token refresh successful.")
+                else:
+                    print("[API] Token is still valid. Skipping auto-refresh.")
             except Exception as exc:
                 print(f"[API] Background token refresh failed: {exc}")
 

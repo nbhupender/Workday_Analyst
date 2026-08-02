@@ -122,16 +122,20 @@ def execute_workday_action(natural_language_query: str, confirmed: bool = False)
 def start_token_refresh_timer():
     import threading
     import time
-    from src.tools.Refresh_token import force_refresh
 
     def run_timer():
         # Sleep for 30 minutes (1800 seconds) repeatedly
         while True:
             time.sleep(1800)
-            print("[MCP Server] 30 minutes timer triggered. Refreshing token...", file=sys.stderr)
             try:
-                force_refresh()
-                print("[MCP Server] Token refreshed via timer.", file=sys.stderr)
+                from src.tools.Refresh_token import load_tokens, is_token_expired, force_refresh
+                tokens = load_tokens()
+                if not tokens or is_token_expired(tokens):
+                    print("[MCP Server] Token is expired. Refreshing...", file=sys.stderr)
+                    force_refresh()
+                    print("[MCP Server] Token refreshed via timer.", file=sys.stderr)
+                else:
+                    print("[MCP Server] Token is still valid. Skipping timer refresh.", file=sys.stderr)
             except Exception as e:
                 print(f"[MCP Server] Token refresh via timer failed: {e}", file=sys.stderr)
 
